@@ -35,12 +35,12 @@ class Rime:
 
     Contains per-device sub-objects.
     """
-    def __init__(self, session: Session, constants: Config, bg_call, async_loop):
+    def __init__(self, session: Session, config: Config, bg_call, async_loop):
         self.devices = []
         self.session = session
-        self.constants = constants
+        self.config = config
         self.bg_call = bg_call
-        media_prefix = constants.get('media_url_prefix', '/media/')
+        media_prefix = config.get('media_url_prefix', '/media/')
         self._event_listeners_lock = threading.Lock()
         self._event_listeners = defaultdict(set[AsyncEventListener])  # event_name -> {listener, ...}
         self._events_queue = asyncio.Queue()
@@ -210,7 +210,7 @@ class Rime:
         if not isinstance(path, list):
             raise ValueError("path must be a list")
 
-        val = self.constants
+        val = self.config
         for key in path[:-1]:
             if key not in val:
                 return default
@@ -237,7 +237,7 @@ class Rime:
 
     def _load_plugins(self):
         plugins = {}
-        for category, plugin_list in self.constants.get('plugins', {}).items():
+        for category, plugin_list in self.config.get('plugins', {}).items():
             if not plugin_list:
                 continue
 
