@@ -3,8 +3,8 @@ import re
 from logging import getLogger
 import shutil
 
+from .base import DeviceFilesystem
 from .android import AndroidDeviceFilesystem, AndroidZippedDeviceFilesystem
-from .devicefilesystem import DeviceFilesystem
 from .ios import IosDeviceFilesystem, IosZippedDeviceFilesystem, IosEncryptedDeviceFilesystem
 
 

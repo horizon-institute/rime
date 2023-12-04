@@ -14,7 +14,7 @@ import zipfile
 
 from iphone_backup_decrypt import EncryptedBackup  # pyright: ignore[reportMissingImports]
 
-from .devicefilesystem import DeviceFilesystem, EncryptedDeviceFilesystem, DirEntry
+from .base import DeviceFilesystem, DirEntry
 from .devicesettings import DeviceSettings
 from .exceptions import NoPassphraseError, NotDecryptedError, WrongPassphraseError
 from .ensuredir import ensuredir
@@ -432,7 +432,7 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         raise NotImplementedError
 
 
-class IosEncryptedDeviceFilesystem(EncryptedDeviceFilesystem):
+class IosEncryptedDeviceFilesystem(DeviceFilesystem):
 
     decrypted_manifest_filename = 'Manifest-decrypted.db'
 

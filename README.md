@@ -9,11 +9,12 @@ This is a project from the University of Nottingham, in conjunction with Telemar
 You'll need the following pre-installed:
 
 * Python 3.10
-* Node.js
+* Node.js 14 or above
 * NPM
 
 If you are using Debian or Ubuntu, you can get these by running `sudo apt install python3.10 npm`. If you're using a Mac
-running Homebrew, you can get them by running `brew install python@3.10 nodejs npm`.
+running Homebrew, you can get them by running `brew install python@3.10 nodejs npm`. If you're using Windows with WSL,
+consult the [Windows readme](README-Windows.md).
 
 Also, you'll need to download the example phone dumps (unless you have your own). These are stored using `git lfs`. If
 you'd already installed `git lfs` prior to checking out this repository, you shouldn't need to do anything; the files

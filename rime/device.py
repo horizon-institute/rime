@@ -1,4 +1,4 @@
-from .filesystem.devicefilesystem import DeviceFilesystem, EncryptedDeviceFilesystem
+from .filesystem.base import DeviceFilesystem
 from .filesystem.exceptions import WrongPassphraseError
 from .session import Session
 from .provider import find_providers
@@ -63,7 +63,7 @@ class Device:
         self.fs.lock(locked)
 
     def is_encrypted(self) -> bool:
-        return isinstance(self.fs, EncryptedDeviceFilesystem) and self.fs.is_encrypted()
+        return self.fs.is_encrypted()
 
     def decrypt(self, passphrase: str):
         """
@@ -72,7 +72,7 @@ class Device:
             - False when decryption is not successful
         """
 
-        if not isinstance(self.fs, EncryptedDeviceFilesystem):
+        if not self.fs.is_encrypted():
             raise NotEncryptedDeviceType(self.id_)
 
         try:

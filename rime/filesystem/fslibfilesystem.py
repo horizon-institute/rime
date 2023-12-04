@@ -1,6 +1,6 @@
 import os
 
-from .devicefilesystem import DirEntry
+from .base import DirEntry
 from .ensuredir import ensuredir
 from ..sql import sqlite3_connect_filename as sqlite3_connect_with_regex_support
 

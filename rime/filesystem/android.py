@@ -8,7 +8,7 @@ import zipfile
 
 import fs.osfs
 
-from .devicefilesystem import DeviceFilesystem, DirEntry
+from .base import DeviceFilesystem, DirEntry
 from .devicesettings import DeviceSettings
 from .fslibfilesystem import FSLibFilesystem
 
