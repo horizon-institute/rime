@@ -227,6 +227,7 @@ class Rime:
         if not hasattr(FILESYSTEM_REGISTRY, 'registry'):
             FILESYSTEM_REGISTRY.registry = FilesystemRegistry(
                 base_path=config.get_pathname('filesystem.base_path'),
+                metadata_path=config.get_pathname('metadata.base_path'),
                 passphrases=config.get('filesystem').get('passphrases')
             )
 

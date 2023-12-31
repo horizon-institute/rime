@@ -15,8 +15,6 @@ from ..media import MediaData
 from . import providernames
 from .providernames import ANDROID_GENERIC_MEDIA, ANDROID_GENERIC_MEDIA_FRIENDLY
 
-from ..metadata import get_fs_metadata
-
 
 @dataclass
 class DirentryProviderInfo:
@@ -67,16 +65,11 @@ class AndroidGenericMedia(Provider):
         """
         Search for events matching ``filter_``, which is an EventFilter.
         """
-        fs_metadata = get_fs_metadata(self.fs)
-
         for direntry in self.fs.walk('/sdcard'):
-            metadata = fs_metadata.get(self.fs, direntry)
-            if not metadata or not metadata.filetype:
+            if not direntry.mime_type:
                 continue
 
-            mime = metadata.filetype.mime
-
-            if mime.startswith('image/') or mime.startswith('video/'):
+            if direntry.mime_type.startswith('image/') or direntry.mime_type.startswith('video/'):
                 category = self.fs.dirname(direntry.path)
 
                 # Attempt to label the provider. We either label it as definitively coming from a
@@ -96,7 +89,7 @@ class AndroidGenericMedia(Provider):
                 )
 
                 yield MediaEvent(
-                    mime_type=mime,
+                    mime_type=direntry.mime_type,
                     local_id=direntry.path,
                     id_=direntry.path,
                     timestamp=datetime.fromtimestamp(direntry.stat().st_ctime),
@@ -115,12 +108,10 @@ class AndroidGenericMedia(Provider):
         """
         return a MediaData object supplying the picture, video, sound, etc identified by 'local_id'.
         """
-        fs_metadata = get_fs_metadata(self.fs)
-        direntry = self.fs.path_to_direntry(local_id)
-        metadata = fs_metadata.get(self.fs, direntry)
+        direntry = self.fs.path_to_direntry(local_id)   # TODO use DB
 
         return MediaData(
-            mime_type=metadata.filetype.mime,
+            mime_type=direntry.mime_type,
             handle=self.fs.open(direntry.path),
             length=direntry.stat().st_size,
         )

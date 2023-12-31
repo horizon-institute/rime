@@ -28,9 +28,14 @@ class FilesystemRegistry:
 
     Filesystems are distinguished by a key, which is the name of the directory they're in under base_path.
     """
-    def __init__(self, base_path, passphrases):
+    def __init__(self, base_path, metadata_path, passphrases):
         self.base_path = base_path
+        self.metadata_path = metadata_path
         self.passphrases = passphrases
+
+        if not os.path.exists(self.metadata_path):
+            os.makedirs(self.metadata_path)
+
         self.filesystems = self._find_available_filesystems()  # maps key to FS object.
 
     def __getitem__(self, key):
@@ -51,7 +56,8 @@ class FilesystemRegistry:
 
                 for fs_cls in FILESYSTEM_TYPES:
                     if fs_cls.is_device_filesystem(path):
-                        filesystems[filename] = fs_cls(filename, path)
+                        metadata_db_path = os.path.join(self.metadata_path, filename + '.sqlite3')
+                        filesystems[filename] = fs_cls(filename, path, metadata_db_path)
 
                         # If the FileSystem is encrypted and there is
                         # a passphrase provided as part of the YAML configuration

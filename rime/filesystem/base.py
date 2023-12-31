@@ -5,8 +5,9 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import os
-import stat
 from typing import Optional
+
+from .direntry import DirEntry
 
 
 @dataclass(frozen=True, unsafe_hash=True)
@@ -15,27 +16,6 @@ class File:
     """
     pathname: str
     mime_type: Optional[str] = None
-
-
-@dataclass(frozen=True, unsafe_hash=True)
-class DirEntry:
-    """
-    Mimic os.DirEntry for the scandir() method. Stores metadata at time of instantiation rather than
-    querying the filesystem the first time (unlike os.DirEntry).
-    """
-    # Ideally we'd use os.DirEntry, but these can't be instantiated.
-    name: str
-    path: str
-    stat_val: os.stat_result
-
-    def is_dir(self):
-        return stat.S_ISDIR(self.stat_val.st_mode)
-
-    def is_file(self):
-        return stat.S_ISREG(self.stat_val.st_mode)
-
-    def stat(self):
-        return self.stat_val
 
 
 class DeviceFilesystem(ABC):
@@ -140,7 +120,15 @@ class DeviceFilesystem(ABC):
 
     @abstractmethod
     def dirname(self, pathname):
-        raise NotImplementedError()
+        raise NotImplementedError(pathname)
+
+    @abstractmethod
+    def basename(self, pathname):
+        raise NotImplementedError(pathname)
+
+    @abstractmethod
+    def stat(self, pathname):
+        raise NotImplementedError(pathname)
 
     @abstractmethod
     def path_to_direntry(self, path) -> DirEntry:

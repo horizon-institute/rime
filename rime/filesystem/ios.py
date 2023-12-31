@@ -18,6 +18,7 @@ from .base import DeviceFilesystem, DirEntry
 from .devicesettings import DeviceSettings
 from .exceptions import NoPassphraseError, NotDecryptedError, WrongPassphraseError
 from .ensuredir import ensuredir
+from . import metadata
 from ..sql import Table, Query, get_field_indices, sqlite3_connect_filename as sqlite3_connect_with_regex_support
 
 log = getLogger(__name__)
@@ -151,6 +152,9 @@ class _IosManifest:
         self._scandir_cache[path] = entries
         return entries
 
+    def stat(self, path):
+        raise NotImplementedError(path)
+
 
 def _ios_filesystem_is_encrypted(path):
     manifest_bplist = os.path.join(path, 'Manifest.plist')
@@ -170,7 +174,7 @@ class IosDeviceFilesystemBase(ABC):
 
 
 class IosDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
-    def __init__(self, id_: str, root: str, writeable_manifest: bool = False):
+    def __init__(self, id_: str, root: str, metadata_db_path: str, writeable_manifest: bool = False):
         self.id_ = id_
         self.root = root
         self.manifest = sqlite3_connect_with_regex_support(
@@ -180,6 +184,7 @@ class IosDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         self.file_table = Table('Files')
         self._settings = DeviceSettings(root)
         self._converter = _IosManifest(self.manifest)
+        self._metadata = metadata.MetadataDb(metadata_db_path)
 
     @classmethod
     def is_device_filesystem(cls, path):
@@ -278,7 +283,13 @@ class IosDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         return self._settings.is_locked()
 
     def dirname(self, path):
-        raise NotImplementedError
+        raise NotImplementedError(path)
+
+    def basename(self, path):
+        raise NotImplementedError(path)
+
+    def stat(self, pathname):
+        raise NotImplementedError(pathname)
 
     def path_to_direntry(self, path):
         raise NotImplementedError
@@ -311,7 +322,7 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         main_dir, = root.iterdir()
         return main_dir
 
-    def __init__(self, id_: str, root: str):
+    def __init__(self, id_: str, root: str, metadata_db_path: str):
         self.id_ = id_
 
         # store the path of the root for other functions
@@ -338,6 +349,7 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         settings_dir, settings_file = os.path.split(self.temp_settings.name)
         self._settings = DeviceSettings(settings_dir, settings_file)
         self._converter = _IosManifest(self.manifest)
+        self._metadata = metadata.MetadataDb(metadata_db_path)
 
     @classmethod
     def is_device_filesystem(cls, path) -> bool:
@@ -426,7 +438,13 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         return self._settings.is_locked()
 
     def dirname(self, path):
-        raise NotImplementedError
+        raise NotImplementedError(path)
+
+    def basename(self, path):
+        raise NotImplementedError(path)
+
+    def stat(self, pathname):
+        raise NotImplementedError(pathname)
 
     def path_to_direntry(self, path):
         raise NotImplementedError
@@ -436,7 +454,7 @@ class IosEncryptedDeviceFilesystem(DeviceFilesystem):
 
     decrypted_manifest_filename = 'Manifest-decrypted.db'
 
-    def __init__(self, id_: str, root: str):
+    def __init__(self, id_: str, root: str, metadata_db_path: str):
         self.id_ = id_
         self.root = root
         self.file_table = Table('Files')
@@ -459,6 +477,7 @@ class IosEncryptedDeviceFilesystem(DeviceFilesystem):
         # Store in case re-decryption is required
         self._passphrase = None
         self._backup = None
+        self._metadata = metadata.MetadataDb(metadata_db_path)
 
     @classmethod
     def is_device_filesystem(cls, path):
@@ -630,7 +649,13 @@ class IosEncryptedDeviceFilesystem(DeviceFilesystem):
         return True
 
     def dirname(self, path):
-        raise NotImplementedError
+        raise NotImplementedError(path)
+
+    def basename(self, path):
+        raise NotImplementedError(path)
+
+    def stat(self, pathname):
+        raise NotImplementedError(pathname)
 
     def path_to_direntry(self, path):
         raise NotImplementedError

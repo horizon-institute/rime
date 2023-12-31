@@ -11,14 +11,15 @@ import fs.osfs
 from .base import DeviceFilesystem, DirEntry
 from .devicesettings import DeviceSettings
 from .fslibfilesystem import FSLibFilesystem
+from .metadata import MetadataDb
 
 
 class AndroidDeviceFilesystem(DeviceFilesystem):
-    def __init__(self, id_: str, root: str):
+    def __init__(self, id_: str, root: str, metadata_db_path: str):
         self.id_ = id_
         self._fs = fs.osfs.OSFS(root)
         self._settings = DeviceSettings(root)
-        self._fsaccess = FSLibFilesystem(self._fs)
+        self._fsaccess = FSLibFilesystem(self._fs, metadata_db_path)
 
     @classmethod
     def is_device_filesystem(cls, path):
@@ -39,11 +40,17 @@ class AndroidDeviceFilesystem(DeviceFilesystem):
     def dirname(self, pathname):
         return self._fsaccess.dirname(pathname)
 
+    def basename(self, pathname):
+        return self._fsaccess.basename(pathname)
+
+    def stat(self, pathname):
+        return self._fsaccess.stat(pathname)
+
     def is_subset_filesystem(self) -> bool:
         return self._settings.is_subset_fs()
 
-    def path_to_direntry(self, path, name=None) -> DirEntry:
-        return self._fsaccess.path_to_direntry(path, name)
+    def path_to_direntry(self, path) -> DirEntry:
+        return self._fsaccess.path_to_direntry(path)
 
     def scandir(self, path):
         return self._fsaccess.scandir(path)
@@ -95,7 +102,7 @@ class AndroidZippedDeviceFilesystem(DeviceFilesystem):
     refer to the data in the temporary directory.
     """
 
-    def __init__(self, id_: str, root: str):
+    def __init__(self, id_: str, root: str, metadata_db_path: str):
         self.id_ = id_
 
         # extract the files from the zipfile in a temporary directory
@@ -108,7 +115,7 @@ class AndroidZippedDeviceFilesystem(DeviceFilesystem):
         # instantiate a filesystem from the temporary directory
         self._fs = fs.osfs.OSFS(os.path.join(self.temp_root.name, main_dir.name))
         self._settings = DeviceSettings(os.path.join(self.temp_root.name, main_dir.name))
-        self._fsaccess = FSLibFilesystem(self._fs)
+        self._fsaccess = FSLibFilesystem(self._fs, metadata_db_path)
 
     @classmethod
     def is_device_filesystem(cls, path):
@@ -159,3 +166,9 @@ class AndroidZippedDeviceFilesystem(DeviceFilesystem):
 
     def dirname(self, pathname):
         return self._fsaccess.dirname(pathname)
+
+    def basename(self, pathname):
+        return self._fsaccess.basename(pathname)
+
+    def stat(self, pathname):
+        return self._fsaccess.stat(pathname)

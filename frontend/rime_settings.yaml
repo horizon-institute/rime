@@ -1,6 +1,8 @@
 # Paths are relative to the directory containing the configuration file.
 filesystem:
   base_path: "../example/"
+metadata:
+  base_path: "./metadata/"
 session:
   database: "rime_session.db"
 media_url_prefix: "http://localhost:5001/media/"
