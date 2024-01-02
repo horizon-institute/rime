@@ -47,9 +47,12 @@ class RimeBGCall:
     def __init__(self, config):
         super().__init__()
 
+        self._initialised = threading.Event()
+
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._bg_thread, args=(config, self._loop), daemon=True)
         self._thread.start()
+        self._initialised.wait()
 
     def _bg_thread(self, config, loop):
         # Create an asyncio event loop. This will drive the background thread.
@@ -57,6 +60,9 @@ class RimeBGCall:
 
         # Create the background RIME.
         self.rime = Rime.create(config, NullBGCall(), loop)
+
+        # Notify the caller that we're ready.
+        self._initialised.set()
 
         # Run the event loop.
         loop.run_forever()
