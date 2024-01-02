@@ -5,9 +5,13 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import os
-from typing import Optional
+from typing import Optional, Any, TYPE_CHECKING
 
 from .direntry import DirEntry
+
+
+if TYPE_CHECKING:
+    from ..sql import Connection
 
 
 @dataclass(frozen=True, unsafe_hash=True)
@@ -35,9 +39,16 @@ class DeviceFilesystem(ABC):
 
     @classmethod
     @abstractmethod
-    def create(cls, id_: str, root: str, template: Optional['DeviceFilesystem'] = None) -> 'DeviceFilesystem':
+    def create(cls, id_: str, root: str, metadata_db_path: str, template: Optional['DeviceFilesystem'] = None) -> 'DeviceFilesystem':
         """
         Create a new filesystem of this type at 'path'.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def __init__(self, id_: str, root: str, metadata_db_path: str):
+        """
+        Initialise a filesystem of this type at 'path'.
         """
         raise NotImplementedError()
 
@@ -70,7 +81,7 @@ class DeviceFilesystem(ABC):
         return 0
 
     @abstractmethod
-    def open(self, path):
+    def open(self, path) -> Any:
         """
         As open().
         """
@@ -84,14 +95,14 @@ class DeviceFilesystem(ABC):
         return None
 
     @abstractmethod
-    def sqlite3_connect(self, path, read_only=True):
+    def sqlite3_connect(self, path, read_only=True) -> 'Connection':
         """
         Return an opened sqlite3 connection to the database at 'path'.
         """
         return None
 
     @abstractmethod
-    def sqlite3_create(self, path):
+    def sqlite3_create(self, path) -> 'Connection':
         """
         Create a new sqlite3 database at 'path' and return an opened connection read-write to it.
         """

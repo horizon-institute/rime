@@ -44,9 +44,11 @@ class DirEntry:
                 first_bytes = f.read(FILE_HEADER_GUESS_LENGTH)
 
             if not first_bytes:
-                raise ValueError(f'File {direntry.path} is empty')
+                raise ValueError(f'File {path} is empty')
 
             filetype = filetype_guess(first_bytes)
             mime_type = filetype.mime
+        else:
+            mime_type = MIME_TYPE_CANNOT_DETERMINE
         
         return cls(path, stat_val, mime_type)
