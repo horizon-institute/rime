@@ -14,12 +14,14 @@ import pypika
 import pypika.utils
 import pypika.queries
 from pypika.terms import Term, Field, Star, Function, ArithmeticExpression
+from pypika.queries import QueryException
 import sqlite3
 
 Table = pypika.Table
 # Query is defined below (we use a custom one)
 Column = pypika.Column
 Parameter = pypika.Parameter
+Connection = sqlite3.Connection
 
 
 def _sqlite3_regexp_search(pattern, input):
@@ -111,7 +113,7 @@ class SqliteQueryBuilder(pypika.queries.QueryBuilder):
                 raise QueryException("You can't return from other tables")
 
     @pypika.utils.builder
-    def returning(self, *terms: Any) -> "SqliteQueryBuilder":
+    def returning(self, *terms: Any) -> "SqliteQueryBuilder":  # type: ignore
         for term in terms:
             if isinstance(term, Field):
                 self._return_field(term)
