@@ -84,7 +84,8 @@ class FilesystemRegistry:
         if not self.is_valid_device_id(key):
             raise ValueError(f"Invalid device ID: {key}")
 
-        self.filesystems[key] = fs.__class__.create(key, path, template=fs)
+        metadata_db_path = os.path.join(self.metadata_path, key + '.sqlite3')
+        self.filesystems[key] = fs.__class__.create(key, path, metadata_db_path, template=fs)
         self.filesystems[key].lock(locked)
 
         return self[key]

@@ -26,14 +26,14 @@ class AndroidDeviceFilesystem(DeviceFilesystem):
         return os.path.exists(os.path.join(path, 'data', 'data', 'android'))
 
     @classmethod
-    def create(cls, id_: str, root: str, template: Optional[DeviceFilesystem] = None) -> DeviceFilesystem:
+    def create(cls, id_: str, root: str, metadata_db_path: str, template: Optional[DeviceFilesystem] = None) -> DeviceFilesystem:
         if os.path.exists(root):
             raise FileExistsError(root)
 
         os.makedirs(root)
         os.makedirs(os.path.join(root, 'data', 'data', 'android'))
 
-        obj = cls(id_, root)
+        obj = cls(id_, root, metadata_db_path)
         obj._settings.set_subset_fs(True)
         return obj
 
@@ -128,8 +128,8 @@ class AndroidZippedDeviceFilesystem(DeviceFilesystem):
             return zipfile.Path(zp, os.path.join(main_dir.name, 'data', 'data', 'android/')).exists()
 
     @classmethod
-    def create(cls, id_: str, root: str, template: Optional['DeviceFilesystem'] = None) -> 'DeviceFilesystem':
-        return AndroidDeviceFilesystem.create(id_, root)
+    def create(cls, id_: str, root: str, metadata_db_path: str, template: Optional['DeviceFilesystem'] = None) -> 'DeviceFilesystem':
+        return AndroidDeviceFilesystem.create(id_, root, metadata_db_path)
 
     def is_subset_filesystem(self) -> bool:
         return self._settings.is_subset_fs()

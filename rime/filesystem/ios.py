@@ -195,7 +195,7 @@ class IosDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         )
 
     @classmethod
-    def create(cls, id_: str, root: str, template: Optional['DeviceFilesystem'] = None) -> 'DeviceFilesystem':
+    def create(cls, id_: str, root: str, metadata_db_path: str, template: Optional['DeviceFilesystem'] = None) -> 'DeviceFilesystem':
         if os.path.exists(root):
             raise FileExistsError(root)
 
@@ -228,7 +228,7 @@ class IosDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
                 with open(os.path.join(root, 'Info.plist'), 'wb') as dst:
                     shutil.copyfileobj(src, dst)
 
-        obj = cls(id_, root, writeable_manifest=True)
+        obj = cls(id_, root, metadata_db_path, writeable_manifest=True)
         obj._settings.set_subset_fs(True)
         return obj
 
@@ -366,13 +366,13 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
             )
 
     @classmethod
-    def create(cls, id_: str, root: str, template: Optional['DeviceFilesystem'] = None) -> 'DeviceFilesystem':
-        return IosDeviceFilesystem.create(id_, root, template=template)
+    def create(cls, id_: str, root: str, metadata_db_path, template: Optional['DeviceFilesystem'] = None) -> 'DeviceFilesystem':
+        return IosDeviceFilesystem.create(id_, root, metadata_db_path, template=template)
 
     def is_subset_filesystem(self) -> bool:
         return self._settings.is_subset_fs()
 
-    def scandir(self, path) -> list[str]:
+    def scandir(self, path) -> list[DirEntry]:
         return self._converter.scandir(path)
 
     def exists(self, path) -> bool:
@@ -390,7 +390,7 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         with zipfile.ZipFile(self.root) as zp:
             # get the main directory contained in the .zip container file
             main_dir = self.get_main_dir(zp)
-            return zp.getinfo(os.path.join(main_dir, self._converter.get_hashed_pathname(path))).file_size
+            return zp.getinfo(os.path.join(str(main_dir), self._converter.get_hashed_pathname(path))).file_size
 
     def ios_open_raw(self, path, mode):
         # TODO: mode
@@ -431,7 +431,7 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         with zipfile.ZipFile(self.root, 'w') as zp:
             # get the main directory contained in the .zip container file
             main_dir = self.get_main_dir(zp)
-            with zp.open(os.path.join(main_dir, '_rime_settings.db'), 'w') as zf:
+            with zp.open(os.path.join(str(main_dir), '_rime_settings.db'), 'w') as zf:
                 zf.write(self.temp_settings.read())
 
     def is_locked(self) -> bool:
@@ -596,7 +596,7 @@ class IosEncryptedDeviceFilesystem(DeviceFilesystem):
 
         _, relative_path = path.split('/', 1)
 
-        self._backup.extract_file(
+        self._backup.extract_file(  # type: ignore[union-attr]
             relative_path=relative_path,
             output_filename=os.path.join(self.root, decrypted_hashed_pathname)
         )
