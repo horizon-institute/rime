@@ -117,8 +117,13 @@ class MetadataDb:
             query = Query\
                 .into(self.mime_types_table)\
                 .columns('mime_type')\
-                .insert(tuple(mime_types_to_add))\
-                .returning("id", "mime_type")
+                .insert(Parameter('?'))
+            self.db.executemany(str(query), [(typ,) for typ in mime_types_to_add])
+
+            query = Query\
+                .from_(self.mime_types_table)\
+                .select(self.mime_types_table.id, self.mime_types_table.mime_type)\
+                .where(self.mime_types_table.mime_type.isin(mime_types_to_add))
             results = self.db.execute(str(query)).fetchall()
 
             mime_type_ids.update({result[1]: result[0] for result in results})  # map mime type to ID

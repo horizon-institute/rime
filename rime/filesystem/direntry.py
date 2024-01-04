@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import mimetypes
 import os
 import stat
 
@@ -10,6 +11,8 @@ MIME_TYPE_NOT_YET_DETERMINED = 'rime/mime-type-not-yet-determined'
 # MIME type for DirEntries which we tried but failed to determine a MIME type for
 # (e.g. because the file is empty)
 MIME_TYPE_CANNOT_DETERMINE = 'rime/mime-type-cannot-determine'
+
+MIME_TYPE_DIRECTORY = 'inode/directory'
 
 # Chosen by fair dice roll.
 # Just kidding, chosen by reference to https://github.com/h2non/filetype.py
@@ -38,16 +41,19 @@ class DirEntry:
         stat_val = fs.stat(path)
 
         if stat.S_ISDIR(stat_val.st_mode):
-            mime_type = 'inode/directory'
+            mime_type = MIME_TYPE_DIRECTORY
         elif stat.S_ISREG(stat_val.st_mode):
             with fs.open(path) as f:
                 first_bytes = f.read(FILE_HEADER_GUESS_LENGTH)
 
             if not first_bytes:
-                raise ValueError(f'File {path} is empty')
-
-            filetype = filetype_guess(first_bytes)
-            mime_type = filetype.mime
+                mime_type = MIME_TYPE_CANNOT_DETERMINE
+            else:
+                filetype = filetype_guess(first_bytes)
+                if filetype is None:
+                    mime_type = mimetypes.guess_type(path)[0] or MIME_TYPE_CANNOT_DETERMINE
+                else:
+                    mime_type = filetype.mime
         else:
             mime_type = MIME_TYPE_CANNOT_DETERMINE
         
