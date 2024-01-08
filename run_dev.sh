@@ -48,6 +48,10 @@ if [ ! -f .venv/bin/activate ]; then
 	source .venv/bin/activate
 	pip install -r requirements.txt
 
+	# Install fastpbkdf2 if possible. Usually it has to be built and so requires a world
+	# in which gcc etc are available. If it fails, just warn the user.
+	pip install fastpbkdf2 || echo "*** WARNING: fastpbkdf2 failed to install. This will make the server slower with encrypted filesystems.***"
+
 	# Install AI requirements unless explicitly asked not to.
 	if [ $NO_AI -eq 0 ]; then
 		pip install -r rime/plugins/ai_requirements.txt
