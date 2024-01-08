@@ -4,6 +4,8 @@ env
 docs/_build
 .venv
 frontend/node_modules
+frontend/metadata
+frontend/rime_session.db
 
 # Ignore example/ directory
 example

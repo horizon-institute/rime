@@ -54,7 +54,9 @@ RIME. If you want to omit them (they take up about 4.4GiB of space on for me) pa
 Alternatively, you can run RIME in a Docker container. The Docker Compose file exposes port 3000 to the local machine.
 
     $ docker compose build
-	$ docker compose up
+    $ docker compose up
+
+This mounts the live dev directory into the container. To speed things up, a virtualenv is also created in a docker volume called 'venv'.  If you need to clean things up, you'll want something like `docker volume rm rime_venv`.
 
 ### Using the dev server
 

@@ -2,6 +2,8 @@
 Quickstart
 ==========
 
+**WARNING: This documentation is out of date.**
+
 The RIME server is a Python application. The GUI frontend is a Web application written in Vue 3. The simplest way to get
 up and running with RIME is to run it with Docker Compose, but you can also run it directly.
 
