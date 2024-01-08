@@ -34,6 +34,7 @@ Copyright 2023 Telemarq Ltd
 	top: 0;
 	position: sticky;
 	background: white;
+	padding: 0.4em;
 }
 
 .searchResultsTable>.row {
