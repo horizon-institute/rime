@@ -8,25 +8,24 @@ import zipfile
 
 import fs.osfs
 
-from .base import DeviceFilesystem, DirEntry
+from .base import DeviceFilesystem
 from .devicesettings import DeviceSettings
 from .fslibfilesystem import FSLibFilesystem
-from .metadata import MetadataDb
 
 
 class AndroidDeviceFilesystem(DeviceFilesystem):
     def __init__(self, id_: str, root: str, metadata_db_path: str):
         self.id_ = id_
-        self._fs = fs.osfs.OSFS(root)
         self._settings = DeviceSettings(root)
-        self._fsaccess = FSLibFilesystem(self._fs, metadata_db_path)
+        self._fsaccess = FSLibFilesystem(fs.osfs.OSFS(root), metadata_db_path)
 
     @classmethod
     def is_device_filesystem(cls, path):
         return os.path.exists(os.path.join(path, 'data', 'data', 'android'))
 
     @classmethod
-    def create(cls, id_: str, root: str, metadata_db_path: str, template: Optional[DeviceFilesystem] = None) -> DeviceFilesystem:
+    def create(cls, id_: str, root: str, metadata_db_path: str, template: Optional[DeviceFilesystem] = None)\
+            -> DeviceFilesystem:
         if os.path.exists(root):
             raise FileExistsError(root)
 
@@ -36,6 +35,10 @@ class AndroidDeviceFilesystem(DeviceFilesystem):
         obj = cls(id_, root, metadata_db_path)
         obj._settings.set_subset_fs(True)
         return obj
+
+    @property
+    def metadata(self):
+        return self._fsaccess.metadata
 
     def dirname(self, pathname):
         return self._fsaccess.dirname(pathname)
@@ -49,20 +52,17 @@ class AndroidDeviceFilesystem(DeviceFilesystem):
     def is_subset_filesystem(self) -> bool:
         return self._settings.is_subset_fs()
 
-    def path_to_direntry(self, path) -> DirEntry:
-        return self._fsaccess.path_to_direntry(path)
-
     def scandir(self, path):
         return self._fsaccess.scandir(path)
 
     def exists(self, path):
-        return self._fs.exists(path)
+        return self._fsaccess.exists(path)
 
     def getsize(self, path):
-        return self._fs.getsize(path)
+        return self._fsaccess.getsize(path)
 
     def open(self, path):
-        return self._fs.open(path, 'rb')
+        return self._fsaccess.open(path)
 
     def create_file(self, path):
         return self._fsaccess.create_file(path)
@@ -78,6 +78,9 @@ class AndroidDeviceFilesystem(DeviceFilesystem):
 
     def is_locked(self) -> bool:
         return self._settings.is_locked()
+
+    def get_dir_entry(self, path):
+        return self._fsaccess.get_dir_entry(path)
 
 
 class AndroidZippedDeviceFilesystem(DeviceFilesystem):
@@ -128,14 +131,12 @@ class AndroidZippedDeviceFilesystem(DeviceFilesystem):
             return zipfile.Path(zp, os.path.join(main_dir.name, 'data', 'data', 'android/')).exists()
 
     @classmethod
-    def create(cls, id_: str, root: str, metadata_db_path: str, template: Optional['DeviceFilesystem'] = None) -> 'DeviceFilesystem':
+    def create(cls, id_: str, root: str, metadata_db_path: str, template: Optional['DeviceFilesystem'] = None)\
+            -> 'DeviceFilesystem':
         return AndroidDeviceFilesystem.create(id_, root, metadata_db_path)
 
     def is_subset_filesystem(self) -> bool:
         return self._settings.is_subset_fs()
-
-    def path_to_direntry(self, path, name=None) -> DirEntry:
-        return self._fsaccess.path_to_direntry(path, name)
 
     def scandir(self, path):
         return self._fsaccess.scandir(path)
@@ -172,3 +173,6 @@ class AndroidZippedDeviceFilesystem(DeviceFilesystem):
 
     def stat(self, pathname):
         return self._fsaccess.stat(pathname)
+
+    def get_dir_entry(self, path):
+        return self._fsaccess.get_dir_entry(path)

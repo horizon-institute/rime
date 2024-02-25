@@ -1,6 +1,5 @@
 import os
 
-from .base import DirEntry
 from .ensuredir import ensuredir
 from . import metadata
 from ..sql import sqlite3_connect_filename as sqlite3_connect_with_regex_support
@@ -12,7 +11,7 @@ log = getLogger(__name__)
 class FSLibFilesystem:
     def __init__(self, _fs, metadata_db_path):
         self._fs = _fs
-        self._metadata = metadata.MetadataDb(metadata_db_path)
+        self.metadata = metadata.MetadataDb(metadata_db_path)
 
     def dirname(self, pathname):
         if '/' not in pathname:
@@ -26,20 +25,22 @@ class FSLibFilesystem:
 
         return pathname[pathname.rindex('/') + 1:]
 
+    def exists(self, path):
+        return self._fs.exists(path)
+
+    def getsize(self, path):
+        return self._fs.getsize(path)
+
     def open(self, path):
         return self._fs.open(path, 'rb')
 
     def stat(self, pathname):
         return os.stat(self._fs.getsyspath(pathname))
 
-    def path_to_direntry(self, path, name=None) -> DirEntry:
-        return DirEntry.from_path(self, path)
-
     def scandir(self, path):
-        result = []
         pathnames = [os.path.join(path, name) for name in self._fs.listdir(path)]
 
-        return metadata.get_dir_entries_and_update_db(self, self._metadata, pathnames)
+        return metadata.get_dir_entries_and_update_db(self, self.metadata, pathnames)
 
     def create_file(self, path):
         ensuredir(self._fs.getsyspath(path))
@@ -55,3 +56,6 @@ class FSLibFilesystem:
         ensuredir(syspath)
 
         return sqlite3_connect_with_regex_support(syspath, read_only=False)
+
+    def get_dir_entry(self, path):
+        return metadata.get_dir_entry_and_update_db(self, self.metadata, path)

@@ -6,11 +6,7 @@ This is used internally by filesystems and exposed through filesystem datastruct
 import os
 import pickle
 
-from dataclasses import dataclass
-
-from .direntry import DirEntry
-
-from ..sql import sqlite3_connect_filename, Table, Query, Column, Parameter
+from ..sql import sqlite3_connect_filename, Table, Query, Parameter, Column
 from .direntry import DirEntry
 
 
@@ -28,15 +24,25 @@ class MetadataDb:
 
         conn = sqlite3_connect_filename(db_pathname, read_only=False)
 
-        query = "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)"
-        conn.execute(query)
+        query = Query.create_table(Table('settings')).if_not_exists().columns(
+            Column('key', 'TEXT'),
+            Column('value', 'TEXT'))\
+            .primary_key('key')
+        conn.execute(query.get_sql())
 
-        query = "CREATE TABLE IF NOT EXISTS mime_types (id INTEGER PRIMARY KEY AUTOINCREMENT, mime_type TEXT)"
-        conn.execute(query)
+        query = Query.create_table(Table('mime_types')).if_not_exists().columns(
+            Column('id', 'INT'),
+            Column('mime_type', 'TEXT'))\
+            .primary_key('id')
+        conn.execute(query.get_sql())
 
-        query = "CREATE TABLE IF NOT EXISTS dir_entries (" +\
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, path TEXT, mime_type_id INTEGER, stat_val TEXT)"
-        conn.execute(query)
+        query = Query.create_table(Table('dir_entries')).if_not_exists().columns(
+            Column('id', 'INT'),
+            Column('path', 'TEXT'),
+            Column('mime_type_id', 'INT'),
+            Column('stat_val', 'TEXT'))\
+            .primary_key('id')
+        conn.execute(query.get_sql())
 
         return conn
 
@@ -111,7 +117,10 @@ class MetadataDb:
         results = self.db.execute(str(query)).fetchall()
 
         mime_type_ids = {result[1]: result[0] for result in results}  # map mime type to ID
-        mime_types_to_add = [dir_entry.mime_type for dir_entry in dir_entries if dir_entry.mime_type not in mime_type_ids]
+        mime_types_to_add = [
+            dir_entry.mime_type
+            for dir_entry in dir_entries
+            if dir_entry.mime_type not in mime_type_ids]
 
         if mime_types_to_add:
             query = Query\
@@ -155,8 +164,19 @@ def get_dir_entries_and_update_db(fs, metadata_db, pathnames: list[str]) -> list
     pathnames_to_add = [pathname for pathname in pathnames if pathname not in found_pathnames]
 
     if pathnames_to_add:
-        dir_entries_to_add = [fs.path_to_direntry(pathname) for pathname in pathnames_to_add]
+        dir_entries_to_add = [DirEntry.from_path(fs, pathname) for pathname in pathnames_to_add]
         metadata_db.add_dir_entries_for_pathnames(dir_entries_to_add)
         dir_entries.extend(dir_entries_to_add)
 
     return dir_entries
+
+
+def get_dir_entry_and_update_db(s, metadata_db, pathname: str) -> DirEntry:
+    """
+    Convenient wrapper around get_dir_entries_and_update_db() for a single pathname.
+    """
+    dir_entries = get_dir_entries_and_update_db(s, metadata_db, [pathname])
+    if len(dir_entries) != 1:
+        raise FileNotFoundError(pathname)
+
+    return dir_entries[0]

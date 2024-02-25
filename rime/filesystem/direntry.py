@@ -18,6 +18,7 @@ MIME_TYPE_DIRECTORY = 'inode/directory'
 # Just kidding, chosen by reference to https://github.com/h2non/filetype.py
 FILE_HEADER_GUESS_LENGTH = 261
 
+
 @dataclass(eq=True, frozen=True)
 class DirEntry:
     """
@@ -56,5 +57,5 @@ class DirEntry:
                     mime_type = filetype.mime
         else:
             mime_type = MIME_TYPE_CANNOT_DETERMINE
-        
+
         return cls(path, stat_val, mime_type)

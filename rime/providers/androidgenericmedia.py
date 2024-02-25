@@ -108,7 +108,7 @@ class AndroidGenericMedia(Provider):
         """
         return a MediaData object supplying the picture, video, sound, etc identified by 'local_id'.
         """
-        direntry = self.fs.path_to_direntry(local_id)   # TODO use DB
+        direntry = self.fs.get_dir_entry(local_id)
 
         return MediaData(
             mime_type=direntry.mime_type,

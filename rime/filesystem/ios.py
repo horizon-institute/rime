@@ -195,7 +195,8 @@ class IosDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         )
 
     @classmethod
-    def create(cls, id_: str, root: str, metadata_db_path: str, template: Optional['DeviceFilesystem'] = None) -> 'DeviceFilesystem':
+    def create(cls, id_: str, root: str, metadata_db_path: str, template: Optional['DeviceFilesystem'] = None)\
+            -> 'DeviceFilesystem':
         if os.path.exists(root):
             raise FileExistsError(root)
 
@@ -242,6 +243,9 @@ class IosDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
 
     def scandir(self, path):
         return self._converter.scandir(path)
+
+    def get_dir_entry(self, path):
+        raise NotImplementedError()
 
     def exists(self, path):
         real_path = self._converter.get_hashed_pathname(path)
@@ -290,9 +294,6 @@ class IosDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
 
     def stat(self, pathname):
         raise NotImplementedError(pathname)
-
-    def path_to_direntry(self, path):
-        raise NotImplementedError
 
 
 class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
@@ -366,7 +367,8 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
             )
 
     @classmethod
-    def create(cls, id_: str, root: str, metadata_db_path, template: Optional['DeviceFilesystem'] = None) -> 'DeviceFilesystem':
+    def create(cls, id_: str, root: str, metadata_db_path, template: Optional['DeviceFilesystem'] = None)\
+            -> 'DeviceFilesystem':
         return IosDeviceFilesystem.create(id_, root, metadata_db_path, template=template)
 
     def is_subset_filesystem(self) -> bool:
@@ -374,6 +376,9 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
 
     def scandir(self, path) -> list[DirEntry]:
         return self._converter.scandir(path)
+
+    def get_dir_entry(self, path):
+        raise NotImplementedError()
 
     def exists(self, path) -> bool:
 
@@ -446,9 +451,6 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
     def stat(self, pathname):
         raise NotImplementedError(pathname)
 
-    def path_to_direntry(self, path):
-        raise NotImplementedError
-
 
 class IosEncryptedDeviceFilesystem(DeviceFilesystem):
 
@@ -496,6 +498,9 @@ class IosEncryptedDeviceFilesystem(DeviceFilesystem):
 
     def scandir(self, path) -> list[str]:
         return []
+
+    def get_dir_entry(self, path):
+        raise NotImplementedError()
 
     def listdir(self, path) -> list[str]:
         if self.manifest is None:
@@ -656,6 +661,3 @@ class IosEncryptedDeviceFilesystem(DeviceFilesystem):
 
     def stat(self, pathname):
         raise NotImplementedError(pathname)
-
-    def path_to_direntry(self, path):
-        raise NotImplementedError

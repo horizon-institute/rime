@@ -4,7 +4,6 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-import os
 from typing import Optional, Any, TYPE_CHECKING
 
 from .direntry import DirEntry
@@ -39,7 +38,8 @@ class DeviceFilesystem(ABC):
 
     @classmethod
     @abstractmethod
-    def create(cls, id_: str, root: str, metadata_db_path: str, template: Optional['DeviceFilesystem'] = None) -> 'DeviceFilesystem':
+    def create(cls, id_: str, root: str, metadata_db_path: str, template: Optional['DeviceFilesystem'] = None)\
+            -> 'DeviceFilesystem':
         """
         Create a new filesystem of this type at 'path'.
         """
@@ -65,6 +65,13 @@ class DeviceFilesystem(ABC):
         As os.scandir().
         """
         return []
+
+    @abstractmethod
+    def get_dir_entry(self, path) -> DirEntry:
+        """
+        Returns a DirEntry (a stat-like object with MIME type) using the metadata database.
+        """
+        raise NotImplementedError()
 
     @abstractmethod
     def exists(self, path) -> bool:
@@ -140,10 +147,6 @@ class DeviceFilesystem(ABC):
     @abstractmethod
     def stat(self, pathname):
         raise NotImplementedError(pathname)
-
-    @abstractmethod
-    def path_to_direntry(self, path) -> DirEntry:
-        raise NotImplementedError()
 
     def is_encrypted(self) -> bool:
         return False
