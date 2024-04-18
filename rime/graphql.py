@@ -142,10 +142,13 @@ def resolve_events(parent, info, deviceIds, filter=None):
     events = []
     device_ids = set()
     providers = set()
+    seen_providers = set()
     message_sessions = set()
     for ebp in EventsByProvider.for_devices(devices, filter_obj):
         device_ids.add(ebp.device.id_)
-        providers.add(ebp.provider)
+        if ebp.provider.NAME not in seen_providers:
+            providers.add(ebp.provider)
+            seen_providers.add(ebp.provider.NAME)
         events.extend(ebp.events)
         message_sessions.update(ebp.message_sessions)
 
@@ -304,11 +307,13 @@ def resolve_providers(parent, info, deviceId, filter=None):
     devices = rime.devices_for_ids([deviceId])
 
     providers = []
+    added_providers = set()
 
     for device in devices:
         for provider in device.providers.values():
-            if filter_obj.name_regex.search(provider.NAME):
+            if filter_obj.name_regex.search(provider.NAME) and provider.NAME not in added_providers:
                 providers.append(provider)
+                added_providers.add(provider.NAME)
 
     return providers
 
