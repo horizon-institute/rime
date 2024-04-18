@@ -18,9 +18,17 @@ const wsLink = new GraphQLWsLink(createClient({
     url: backendUrl + '/graphql-ws',
 }));
 
+const apolloCache = new InMemoryCache({
+    typePolicies: {
+        MessageEvent: {
+            keyFields: ['id', 'deviceId', 'providerName'],
+        },
+    }
+});
+
 export const apolloClient = new ApolloClient({
     link: wsLink,
-    cache: new InMemoryCache(),
+    cache: apolloCache,
 });
 
 provideApolloClient(apolloClient);
