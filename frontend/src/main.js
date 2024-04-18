@@ -4,16 +4,11 @@
 
 import { createApp, provide } from 'vue'
 import './style.css'
-import { createPinia } from 'pinia'
 import { DefaultApolloClient } from '@vue/apollo-composable'
 import App from './App.vue'
 import { apolloClient } from './store'
 
 const app = createApp(App);
-
-/* Store */
-const pinia = createPinia();
-app.use(pinia);
 
 app.provide(DefaultApolloClient, apolloClient);
 
