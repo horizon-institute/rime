@@ -4,6 +4,7 @@ Serve GraphQL on a socket.
 
 import asyncio
 import os
+import resource
 import threading
 import urllib.parse
 import sys
@@ -106,6 +107,9 @@ class RimeSingleton:
 
 
 def create_app():
+    # Increase number of open files, particularly relevant on macOS.
+    resource.setrlimit(resource.RLIMIT_NOFILE, (4096, 4096))
+
     # Read config
     frontend_host, frontend_port = os.environ.get('RIME_FRONTEND', 'localhost:3000').split(':')
     for filename in (os.environ.get('RIME_CONFIG', 'rime_settings.local.yaml'), 'rime_settings.yaml'):
