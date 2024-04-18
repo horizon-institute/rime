@@ -95,6 +95,9 @@ GROUP_USERS = {}  # Maps FS ID to {group jid: list of user jids}
 GROUP_PARTICIPANT_USER_IDS = {}  # Maps FS ID to {group jid: list of group participant user _id fields}
 
 
+def anonymise_jid(db_anonymiser, table_name, column_name):
+    return anonymise_phone(db_anonymiser, table_name, column_name)
+
 # Extra information for message events, for recreation during subsetting.
 @dataclass
 class WhatsappMessageEvent:
@@ -158,7 +161,8 @@ class AndroidWhatsApp(Provider):
             number = row[fields['number']]
             # It's possible for number to be null, in which case we use the first part of the jid.
             if number is None:
-                number = '+' + jid.split('@')[0]
+                jid_start = jid.split('@')[0]
+                number = jid_start if jid_start.startswith('+') else '+' + jid_start
 
             new_contact.name.first = row[fields['given_name']]
             new_contact.name.last = row[fields['family_name']]
@@ -423,7 +427,7 @@ class AndroidWhatsApp(Provider):
         'sqlite3': {
             WA_DB: {
                 'wa_contacts': {
-                    'jid': anonymise_phone,
+                    'jid': anonymise_jid,
                     'number': anonymise_phone,
                     'display_name': anonymise_name,
                     'given_name': anonymise_name,
