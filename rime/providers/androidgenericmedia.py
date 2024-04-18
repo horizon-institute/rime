@@ -42,7 +42,7 @@ class AndroidGenericMedia(Provider):
     NAME = ANDROID_GENERIC_MEDIA
     FRIENDLY_NAME = ANDROID_GENERIC_MEDIA_FRIENDLY
 
-    PII_FIELDS = []
+    PII_FIELDS = {}
 
     def __init__(self, fs):
         self.fs = fs
