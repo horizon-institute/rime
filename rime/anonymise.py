@@ -17,7 +17,7 @@ RE_PHONE = re.compile(r'\+?[0-9 -]{8,15}')
 RE_EMAIL = re.compile(r'[^@]+@[^@]+\.[^@]+')
 
 
-def _canonicalise_phone_number(phone_number, country_code):
+def canonicalise_phone_number(phone_number, country_code):
     """
     Return the E164 representation of phone_number if possible, or the original number otherwise.
 
@@ -39,7 +39,7 @@ class _AnonMap:
         self._next_phone = 1
         self._next_email = 1
         self._anon_email = {}  # email address to anonymised email address
-        self._anon_phone = {}  # _canonicalise_phone_number(original phone number) to anonymised phone number
+        self._anon_phone = {}  # canonicalise_phone_number(original phone number) to anonymised phone number
 
     def anonymise_phone(self, phone):
         if phone not in self._anon_phone:
@@ -96,7 +96,7 @@ class DBAnonymiser:
 
     def anonymise_phone(self, table, column):
         def _new_phone(match_obj):
-            orig_phone = _canonicalise_phone_number(match_obj.group(0), 'GB')
+            orig_phone = canonicalise_phone_number(match_obj.group(0), 'GB')
             return self.anon_map.anonymise_phone(orig_phone)
 
         self.anonymise_regex(table, column, RE_PHONE, _new_phone)
