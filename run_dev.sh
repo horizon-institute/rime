@@ -8,6 +8,20 @@ set -e
 
 PYTHON=${PYTHON:-python3.10}
 
+# If Python doesn't exist, try a generic version 3.
+if ! command -v $PYTHON &> /dev/null; then
+	if command -v python3; then
+		PYTHON=python3
+		echo WARNING:
+		echo WARNING: Python 3.10 not found. Falling back to `python3 --version`.
+		echo WARNING: If you experience any issues, please try Python 3.10.
+		echo WARNING:
+	else
+		echo ERROR: Python 3.10 not found. Please install it or set the PYTHON environment variable.
+		exit 1
+	fi
+fi
+
 # Parse command line arguments.
 NO_AI=0
 DEPS_ONLY=0
