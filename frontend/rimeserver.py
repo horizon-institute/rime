@@ -3,11 +3,13 @@ Serve GraphQL on a socket.
 """
 
 import asyncio
+import concurrent.futures
 import os
 import resource
-import threading
 import urllib.parse
 import sys
+import signal
+import traceback
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -25,86 +27,43 @@ from rime.graphql import schema, QueryContext
 from rime.config import Config
 
 
-class NullBGCall:
+def rime_background_task_entrypoint(config, cmd, args):
     """
-    Acts like a BG Executor, but is passed to the background RIME and just runs things immediately.
+    This is started in a separate process. It performs a single task and then exits.
+
+    'config' is the Rime configuration.
     """
-    def __init__(self):
-        super().__init__()
-        self._rime = None
+    aio_loop = asyncio.new_event_loop()
 
-    def set_rime(self, rime):
-        self._rime = rime
+    # Reset signal behaviour; see https://github.com/encode/uvicorn/issues/548#issuecomment-1157082729
+    signal.set_wakeup_fd(-1) # don't send the signal into shared socket
+    signal.signal(signal.SIGTERM, signal.SIG_DFL) # reset signal handlers to default
+    signal.signal(signal.SIGINT, signal.SIG_DFL) # reset signal handlers to default
 
-    def __call__(self, fn, *args, **kwargs):
-        return fn(self._rime, *args, **kwargs)
+    asyncio.set_event_loop(aio_loop)
 
+    async def bg_enqueue_bg_call(rime, fn, *args, on_complete_fn=None):
+        # Background RIME also needs a 'run in background' task, but we just run in fg here.
+        exc = None
 
-class RimeBGCall:
-    """
-    When invoked, run the given function in the background, passing as a first argument 'rime'
-    (which should correspond to the background RIME instance).
-    """
-    def __init__(self, config):
-        super().__init__()
+        try:
+            result = aio_loop.run_until_complete(fn(rime, *args))
+        except Exception as e:
+            traceback.print_exc()
+            result = None
+            exc = e
 
-        self._initialised = threading.Event()
+        if on_complete_fn is not None:
+            await on_complete_fn(rime, result, exc)
 
-        self._loop = asyncio.new_event_loop()
-        self._thread = threading.Thread(target=self._bg_thread, args=(config, self._loop), daemon=True)
-        self._thread.start()
-        self._initialised.wait()
+    async def run_cmd_in_background_rime():
+        bg_rime = Rime.create(config, bg_enqueue_bg_call)
+        return await cmd(bg_rime, *args)
 
-    def _bg_thread(self, config, loop):
-        # Create an asyncio event loop. This will drive the background thread.
-        asyncio.set_event_loop(loop)
+    result = aio_loop.run_until_complete(run_cmd_in_background_rime())
+    aio_loop.close()
 
-        # Create the background RIME.
-        self.rime = Rime.create(config, NullBGCall(), loop)
-
-        # Notify the caller that we're ready.
-        self._initialised.set()
-
-        # Run the event loop.
-        loop.run_forever()
-
-    def __call__(self, fn, *args, bg_call_complete_fn=None, **kwargs):
-        future = asyncio.run_coroutine_threadsafe(fn(self.rime, *args, **kwargs), self._loop)
-
-        if bg_call_complete_fn:
-            future.add_done_callback(bg_call_complete_fn)
-
-        return future
-
-
-class RimeSingleton:
-    """
-    Serialise access to RIME so all DB access is done from the same thread.
-
-    We use the current thread for foreground tasks, and create a separate background
-    thread for background tasks such as subsetting with anonymisation.
-    """
-    def __init__(self, config, async_loop):
-        super().__init__()
-
-        self._config = config
-        self._bg_call = RimeBGCall(config)
-
-        # Create the foreground RIME.
-        self._rime = Rime.create(config, self._bg_call, async_loop)
-
-    def get_context_value(self, request, data):
-        return QueryContext(self._rime)
-
-    async def get_media(self, media_id):
-        return self._rime.get_media(media_id)
-
-    async def startup(self):
-        await self._rime.start_background_tasks_async()
-
-    async def shutdown(self):
-        await self._rime.stop_background_tasks_async()
-
+    return result
 
 def create_app():
     # Increase number of open files, particularly relevant on macOS.
@@ -121,7 +80,29 @@ def create_app():
         print("Configuration file not found. Create rime_settings.local.yaml or set RIME_CONFIG.")
         sys.exit(1)
 
-    rime = RimeSingleton(rime_config, asyncio.get_running_loop())
+    bg_task_executor = concurrent.futures.ProcessPoolExecutor()
+
+    async def enqueue_background_task(rime, cmd, *args, on_complete_fn=None):
+        assert isinstance(rime, Rime)
+
+        # Start a new process to run the background task.
+        future = bg_task_executor.submit(rime_background_task_entrypoint, rime_config, cmd, args)
+
+        afuture = asyncio.wrap_future(future)
+
+        # Wait for the async task to complete and translate exceptions into parameters for the callback.
+        try:
+            result = await afuture
+            exc = None
+        except Exception as e:
+            traceback.print_exc()
+            result = None
+            exc = e
+
+        if on_complete_fn is not None:
+            await on_complete_fn(rime, result, exc)
+
+    rime = Rime.create(rime_config, enqueue_background_task)
     app = FastAPI()
 
     # Add CORS middleware to allow the frontend to communicate with the backend on a different port.
@@ -139,25 +120,28 @@ def create_app():
 
     @app.on_event("startup")
     async def startup():
-        await rime.startup()
+        await rime.start_background_tasks_async()
 
     @app.on_event("shutdown")
     async def shutdown():
-        await rime.shutdown()
+        await rime.stop_background_tasks_async()
 
     @app.get("/media/{media_id:path}")
     async def handle_media(media_id: str):
         media_id = urllib.parse.unquote(media_id)
-        media_data = await rime.get_media(media_id)
+        media_data =  rime.get_media(media_id)
 
         response = StreamingResponse(media_data.handle, media_type=media_data.mime_type)
         response.headers['Content-Length'] = str(media_data.length)
         return response
 
+    def get_context_value(request, data):
+        return QueryContext(rime)
+
     graphql_app = AriadneGraphQL(
         schema,
         websocket_handler=GraphQLTransportWSHandler(),
-        context_value=rime.get_context_value
+        context_value=get_context_value
     )
 
     # For checking that the server is up:

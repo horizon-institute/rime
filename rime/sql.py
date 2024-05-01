@@ -28,31 +28,6 @@ def _sqlite3_regexp_search(pattern, input):
     return bool(re.search(pattern, input))
 
 
-_threadsafety = None
-
-
-def _sqlite3_is_threadsafe():
-    global _threadsafety
-
-    if _threadsafety is None:
-        if (sys.version_info.major, sys.version_info.minor) >= (3, 11):
-            # Python >= 3.11 populates sqlite3.threadsafety dynamically
-            _threadsafety = sqlite3.threadsafety
-        else:
-            # Python < 3.11 hard-codes sqlite3.threadsafety, so query the database.
-            conn = sqlite3.connect(':memory:')
-            res = conn.execute(
-                "SELECT * FROM pragma_compile_options WHERE compile_options LIKE 'THREADSAFE%'"
-            ).fetchone()[0]
-            conn.close()
-
-            SQLITE_THREADSAFE = int(res.split('=')[1])
-            # This mapping defined under sqlite3.threadsafety in the Python docs.
-            _threadsafety = {0: 0, 2: 1, 1: 3}.get(SQLITE_THREADSAFE, 0)
-
-    return _threadsafety == 3
-
-
 def sqlite3_connect(db_path, uri=False):
     """
     Connect to an sqlite3 database and add support for regular expression matching.
@@ -63,9 +38,6 @@ def sqlite3_connect(db_path, uri=False):
 
     if uri is False and db_path.startswith('file:'):
         raise ValueError(f"Supplied a URI-looking db_path of {db_path} but uri is False")
-
-    if not _sqlite3_is_threadsafe():
-        raise RuntimeError("RIME requires a thread-safe sqlite3 module (sqlite3.threadsafety == 3)")
 
     try:
         conn = sqlite3.connect(db_path, uri=uri, check_same_thread=check_same_thread)

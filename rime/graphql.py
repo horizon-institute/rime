@@ -473,6 +473,7 @@ class CreateSubsetError(Exception):
     """
     Error occurred while creating a subset.
     """
+    ERR_NONE = 0
     ERR_NAME_EXISTS = 1
     ERR_NAME_INVALID = 2
     ERR_UNKNOWN = 3
@@ -547,11 +548,10 @@ def _create_subset_populate_device(rime, opts: SubsetOptions, device, new_device
 mutation = MutationType()
 
 
-@mutation.field('createSubset')
-def resolve_create_subset(rime, info, targets, eventsFilter, contactsFilter, anonymise):
-    rime = info.context.rime
-
+async def _create_subset_impl(rime, targets, eventsFilter, contactsFilter, anonymise):
+    # TODO: status updates
     devices = []  # list of (old device, new device)
+    new_device_ids = []
 
     # Create default subset options. TODO: Expose these to GraphQL.
     opts = SubsetOptions(
@@ -559,68 +559,62 @@ def resolve_create_subset(rime, info, targets, eventsFilter, contactsFilter, ano
         anonymise=anonymise,
     )
 
-    async def _create_subset_impl(bg_rime):
-        # TODO: Error reporting, status updates
-        errorMessage = None
-        errorCode = 0
-        anonymiser = Anonymiser(bg_rime) if anonymise else None
-        events_filter_obj = _make_events_filter(eventsFilter)
-        contacts_filter_obj = _make_contacts_filter(contactsFilter)
+    anonymiser = Anonymiser(rime) if anonymise else None
+    events_filter_obj = _make_events_filter(eventsFilter)
+    contacts_filter_obj = _make_contacts_filter(contactsFilter)
 
-        for target in targets:
-            old_device, new_device = _create_subset_prepare_device(rime, target)
-            devices.append((old_device, new_device))
+    success = False
 
-        try:
+    for target in targets:
+        old_device, new_device = _create_subset_prepare_device(rime, target)
+        devices.append((old_device, new_device))
+
+    try:
+        for old_device, new_device in devices:
+            _create_subset_populate_device(rime, opts, old_device, new_device, events_filter_obj,
+                                           contacts_filter_obj)
+            if anonymiser:
+                for provider in new_device.providers.values():
+                    anonymiser.anonymise_device_provider(new_device, provider)
+            new_device.lock(False)
+            new_device_ids.append(new_device.id_)
+        success = True
+    finally:
+        # Remove partially-created but -failed clones.
+        if not success:
             for old_device, new_device in devices:
-                _create_subset_populate_device(bg_rime, opts, old_device, new_device, events_filter_obj,
-                                               contacts_filter_obj)
-                if anonymiser:
-                    for provider in new_device.providers.values():
-                        anonymiser.anonymise_device_provider(new_device, provider)
-                new_device.lock(False)
-        except CreateSubsetError as e:
-            traceback.print_exc()
-            errorMessage = str(e)
-            errorCode = e.code
-        except Exception as e:
-            traceback.print_exc()
-            errorMessage = str(e)
-            errorCode = CreateSubsetError.ERR_UNKNOWN
+                rime.delete_device(new_device.id_)
 
-        if errorCode:
-            for old_device, new_device in devices:
-                bg_rime.delete_device(new_device.id_)
+    # Rescan our own device list.
+    rime.rescan_devices()
 
-        # Rescan our own device list.
-        bg_rime.rescan_devices()
+    return new_device_ids
 
-    new_device_ids = [new_device.id_ for _old_device, new_device in devices]
 
+async def _create_subset_complete(rime, new_device_ids, exc):
     # Callback when the subset task finishes.
-    def subset_complete(future):
-        try:
-            future.result()
-        except Exception as e:
-            traceback.print_exc()
-            rime.publish_event('subset_complete', {
-                'success': False,
-                'deviceIds': new_device_ids,
-                'errorMessage': str(e),
-                'errorCode': CreateSubsetError.ERR_UNKNOWN,
-            })
-        else:
-            rime.publish_event('subset_complete', {
-                'success': True,
-                'deviceIds': new_device_ids,
-                'errorMessage': None,
-                'errorCode': 0,
-            })
+    if exc:
+        rime.publish_event('subset_complete', {
+            'success': False,
+            'deviceIds': [],
+            'errorMessage': str(exc),
+            'errorCode': exc.code if isinstance(exc, CreateSubsetError) else CreateSubsetError.ERR_UNKNOWN,
+        })
+    else:
+        rime.publish_event('subset_complete', {
+            'success': True,
+            'deviceIds': new_device_ids,
+            'errorMessage': None,
+            'errorCode': 0,
+        })
 
-        rime.publish_event('device_list_updated')
+    rime.publish_event('device_list_updated')
 
-    # Perform subsetting in the background.
-    rime.bg_call(_create_subset_impl, bg_call_complete_fn=subset_complete)
+
+@mutation.field('createSubset')
+def resolve_create_subset(rime, info, targets, eventsFilter, contactsFilter, anonymise):
+    rime = info.context.rime
+    rime.bg_call(_create_subset_impl, targets, eventsFilter, contactsFilter, anonymise, on_complete_fn=_create_subset_complete)
 
     return True
 

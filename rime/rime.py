@@ -35,11 +35,11 @@ class Rime:
 
     Contains per-device sub-objects.
     """
-    def __init__(self, session: Session, config: Config, bg_call, async_loop):
+    def __init__(self, session: Session, config: Config, enqueue_bg_call, async_loop=None):
         self.devices = []
         self.session = session
         self.config = config
-        self.bg_call = bg_call
+        self._enqueue_bg_call = enqueue_bg_call
         media_prefix = config.get('media_url_prefix', '/media/')
         self._event_listeners_lock = threading.Lock()
         self._event_listeners = defaultdict(set[AsyncEventListener])  # event_name -> {listener, ...}
@@ -52,8 +52,16 @@ class Rime:
 
         self._file_watcher_stop_event = asyncio.Event()
 
-        async_loop.create_task(self._event_handler())
-        async_loop.create_task(self._device_list_updated_watcher())
+        if async_loop is None:
+            self.async_loop = asyncio.get_running_loop()
+        else:
+            self.async_loop = async_loop
+
+        self.async_loop.create_task(self._event_handler())
+        self.async_loop.create_task(self._device_list_updated_watcher())
+
+    def bg_call(self, fn, *args, on_complete_fn=None):
+        self.async_loop.create_task(self._enqueue_bg_call(self, fn, *args, on_complete_fn=on_complete_fn))
 
     async def _device_list_updated_watcher(self):
         async for args in self.wait_for_events_async('device_list_updated'):
@@ -223,7 +231,7 @@ class Rime:
         return FILESYSTEM_REGISTRY.registry
 
     @classmethod
-    def create(cls, config: Config, bg_call, async_loop):
+    def create(cls, config: Config, bg_call, async_loop=None):
         if not hasattr(FILESYSTEM_REGISTRY, 'registry'):
             FILESYSTEM_REGISTRY.registry = FilesystemRegistry(
                 base_path=config.get_pathname('filesystem.base_path'),
@@ -232,7 +240,7 @@ class Rime:
             )
 
         session = Session(config.get_pathname('session.database'))
-        obj = cls(session, config, bg_call, async_loop)
+        obj = cls(session, config, bg_call, async_loop=async_loop)
 
         return obj
 
