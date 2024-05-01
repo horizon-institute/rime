@@ -124,6 +124,7 @@ def create_app():
 
     @app.on_event("shutdown")
     async def shutdown():
+        bg_task_executor.shutdown()
         await rime.stop_background_tasks_async()
 
     @app.get("/media/{media_id:path}")
