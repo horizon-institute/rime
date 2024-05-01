@@ -57,8 +57,7 @@ class Rime:
         else:
             self.async_loop = async_loop
 
-        self.async_loop.create_task(self._event_handler())
-        self.async_loop.create_task(self._device_list_updated_watcher())
+        self._async_tasks = []
 
     def bg_call(self, fn, *args, on_complete_fn=None):
         self.async_loop.create_task(self._enqueue_bg_call(self, fn, *args, on_complete_fn=on_complete_fn))
@@ -92,7 +91,6 @@ class Rime:
 
     # TODO: Need a synchronous version of this (or, better, a single version that can be used in both contexts)
     async def start_background_tasks_async(self):
-        event_loop = asyncio.get_running_loop()
         self._file_watcher_stop_event = asyncio.Event()
 
         async def watch_files_async(base_path):
@@ -105,10 +103,16 @@ class Rime:
 
                 await asyncio.sleep(0.5)
 
-        event_loop.create_task(watch_files_async(self.filesystem_registry.base_path))
+        for async_task in (
+                watch_files_async(self.filesystem_registry.base_path),
+                self._event_handler(),
+                self._device_list_updated_watcher()):
+            self._async_tasks.append(self.async_loop.create_task(async_task))
 
     async def stop_background_tasks_async(self):
         self._file_watcher_stop_event.set()
+        for task in self._async_tasks:
+            task.cancel()
 
     def devices_for_ids(self, device_ids: list[str]) -> list[Device]:
         return [device for device in self.devices if device.id_ in device_ids]
