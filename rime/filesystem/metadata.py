@@ -17,6 +17,7 @@ class MetadataDb:
         self.mime_types_table = Table('mime_types')
 
         self.db = self._init_db(db_pathname)
+        self._db_pathname = db_pathname
 
     def _init_db(self, db_pathname):
         if not os.path.exists(os.path.dirname(db_pathname)):
@@ -24,25 +25,26 @@ class MetadataDb:
 
         conn = sqlite3_connect_filename(db_pathname, read_only=False)
 
-        query = Query.create_table(Table('settings')).if_not_exists().columns(
-            Column('key', 'TEXT'),
-            Column('value', 'TEXT'))\
-            .primary_key('key')
-        conn.execute(query.get_sql())
+        with conn:
+            query = Query.create_table(Table('settings')).if_not_exists().columns(
+                Column('key', 'TEXT'),
+                Column('value', 'TEXT'))\
+                .primary_key('key')
+            conn.execute(query.get_sql())
 
-        query = Query.create_table(Table('mime_types')).if_not_exists().columns(
-            Column('id', 'INT'),
-            Column('mime_type', 'TEXT'))\
-            .primary_key('id')
-        conn.execute(query.get_sql())
+            query = Query.create_table(Table('mime_types')).if_not_exists().columns(
+                Column('id', 'INT'),
+                Column('mime_type', 'TEXT'))\
+                .primary_key('id')
+            conn.execute(query.get_sql())
 
-        query = Query.create_table(Table('dir_entries')).if_not_exists().columns(
-            Column('id', 'INT'),
-            Column('path', 'TEXT'),
-            Column('mime_type_id', 'INT'),
-            Column('stat_val', 'TEXT'))\
-            .primary_key('id')
-        conn.execute(query.get_sql())
+            query = Query.create_table(Table('dir_entries')).if_not_exists().columns(
+                Column('id', 'INT'),
+                Column('path', 'TEXT'),
+                Column('mime_type_id', 'INT'),
+                Column('stat_val', 'TEXT'))\
+                .primary_key('id')
+            conn.execute(query.get_sql())
 
         return conn
 
@@ -64,7 +66,8 @@ class MetadataDb:
 
     def _set_setting(self, key, value):
         query = Query.into(self.settings_table).insert(key=key, value=value).on_duplicate_key_update(value=value)
-        self.db.execute(str(query))
+        with self.db:
+            self.db.execute(str(query))
 
     def is_subset_fs(self):
         return self._get_setting('subset_fs') == '1'
@@ -109,46 +112,47 @@ class MetadataDb:
 
         The pathnames must not already exist in the database.
         """
-        # Create or update mime type IDs from mime types.
-        query = Query \
-            .from_(self.mime_types_table) \
-            .select(self.mime_types_table.id, self.mime_types_table.mime_type) \
-            .where(self.mime_types_table.mime_type.isin([dir_entry.mime_type for dir_entry in dir_entries]))
-        results = self.db.execute(str(query)).fetchall()
-
-        mime_type_ids = {result[1]: result[0] for result in results}  # map mime type to ID
-        mime_types_to_add = [
-            dir_entry.mime_type
-            for dir_entry in dir_entries
-            if dir_entry.mime_type not in mime_type_ids]
-
-        if mime_types_to_add:
-            query = Query\
-                .into(self.mime_types_table)\
-                .columns('mime_type')\
-                .insert(Parameter('?'))
-            self.db.executemany(str(query), [(typ,) for typ in mime_types_to_add])
-
-            query = Query\
-                .from_(self.mime_types_table)\
-                .select(self.mime_types_table.id, self.mime_types_table.mime_type)\
-                .where(self.mime_types_table.mime_type.isin(mime_types_to_add))
+        with self.db:
+            # Create or update mime type IDs from mime types.
+            query = Query \
+                .from_(self.mime_types_table) \
+                .select(self.mime_types_table.id, self.mime_types_table.mime_type) \
+                .where(self.mime_types_table.mime_type.isin([dir_entry.mime_type for dir_entry in dir_entries]))
             results = self.db.execute(str(query)).fetchall()
 
-            mime_type_ids.update({result[1]: result[0] for result in results})  # map mime type to ID
+            mime_type_ids = {result[1]: result[0] for result in results}  # map mime type to ID
+            mime_types_to_add = [
+                dir_entry.mime_type
+                for dir_entry in dir_entries
+                if dir_entry.mime_type not in mime_type_ids]
 
-        # Add the dir entries.
-        query = Query\
-            .into(self.dir_entries_table)\
-            .columns('path', 'mime_type_id', 'stat_val')\
-            .insert(Parameter('?'), Parameter('?'), Parameter('?'))
+            if mime_types_to_add:
+                query = Query\
+                    .into(self.mime_types_table)\
+                    .columns('mime_type')\
+                    .insert(Parameter('?'))
+                self.db.executemany(str(query), [(typ,) for typ in mime_types_to_add])
 
-        parameters = [
-            (dir_entry.path, mime_type_ids[dir_entry.mime_type], pickle.dumps(dir_entry.stat_val))
-            for dir_entry in dir_entries
-        ]
+                query = Query\
+                    .from_(self.mime_types_table)\
+                    .select(self.mime_types_table.id, self.mime_types_table.mime_type)\
+                    .where(self.mime_types_table.mime_type.isin(mime_types_to_add))
+                results = self.db.execute(str(query)).fetchall()
 
-        self.db.executemany(str(query), parameters)
+                mime_type_ids.update({result[1]: result[0] for result in results})  # map mime type to ID
+
+            # Add the dir entries.
+            query = Query\
+                .into(self.dir_entries_table)\
+                .columns('path', 'mime_type_id', 'stat_val')\
+                .insert(Parameter('?'), Parameter('?'), Parameter('?'))
+
+            parameters = [
+                (dir_entry.path, mime_type_ids[dir_entry.mime_type], pickle.dumps(dir_entry.stat_val))
+                for dir_entry in dir_entries
+            ]
+
+            self.db.executemany(str(query), parameters)
 
 
 def get_dir_entries_and_update_db(fs, metadata_db, pathnames: list[str]) -> list[DirEntry]:
