@@ -22,7 +22,7 @@ h11==0.14.0
 httptools==0.6.1
 idna==3.7
 iniconfig==2.0.0
--e git+https://github.com/jsharkey13/iphone_backup_decrypt@917ad4c00c2ee63ce7c5bc6b37a5ac502cdc9a5c#egg=iphone_backup_decrypt
+iphone-backup-decrypt==0.7.0
 mccabe==0.7.0
 multidict==6.0.5
 packaging==23.1
@@ -30,7 +30,7 @@ phonenumbers==8.13.15
 pluggy==1.2.0
 pycodestyle==2.10.0
 pycparser==2.21
-pycryptodome==3.18.0
+pycryptodome==3.20.0
 pydantic==1.10.9
 pyflakes==3.0.1
 PyPika==0.48.9
