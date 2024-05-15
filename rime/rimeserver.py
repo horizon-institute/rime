@@ -1,26 +1,29 @@
 """
-Serve GraphQL on a socket.
+Serve GraphQL on a socket with FastAPI.
+
+Designed to be run from a frontend such as Uvicorn; use create_app as a factory.
 """
 
 import asyncio
 import concurrent.futures
+import mimetypes
 import os
 import resource
 import urllib.parse
 import sys
 import signal
 import traceback
+import zipfile
 
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
+from starlette.responses import RedirectResponse
 from starlette.websockets import WebSocket
 from ariadne.asgi import GraphQL as AriadneGraphQL
 from ariadne.asgi.handlers import GraphQLTransportWSHandler
-
-# Assume RIME is in the directory above this one.
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from rime import Rime
 from rime.graphql import schema, QueryContext
@@ -64,6 +67,19 @@ def rime_background_task_entrypoint(config, cmd, args):
     aio_loop.close()
 
     return result
+
+
+class ZippedStaticFiles:
+    def __init__(self, zip_pathname):
+        self.zf = zipfile.ZipFile(zip_pathname, 'r')
+
+    def __call__(self, path):
+        if path == '':
+            path = 'index.html'
+
+        mime_type = mimetypes.guess_type(path)[0]
+        return StreamingResponse(self.zf.open(path), media_type=mime_type)
+
 
 def create_app():
     # Increase number of open files, particularly relevant on macOS.
@@ -160,5 +176,13 @@ def create_app():
     @app.websocket("/graphql-ws")
     async def handle_graphql_ws(websocket: WebSocket):
         return await graphql_app.handle_websocket(websocket)
+
+    frontend_path = os.environ.get('RIME_FRONTEND_PATH')
+    if frontend_path:
+        app.get("/rime/{path:path}")(ZippedStaticFiles(frontend_path))
+
+        @app.get("/")
+        async def redirect_to_frontend():
+            return RedirectResponse(url="/rime")
 
     return app

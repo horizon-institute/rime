@@ -13,6 +13,7 @@ export default defineConfig({
         port: 3000,
         strictPort: true,
     },
+    base: '/rime/',
     envDir: './',
     envPrefix: 'RIME',
     clearScreen: false,

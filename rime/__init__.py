@@ -4,3 +4,4 @@
 
 from .rime import Rime
 import graphql
+from .rimeserver import create_app as rimeserver_create_app

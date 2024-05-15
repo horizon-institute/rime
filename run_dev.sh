@@ -107,6 +107,14 @@ fi
 npm run dev -- $VITE_OPTS &
 VITE_PID=$!
 
+cd ..
+
+if [ -f frontend/rime_settings.local.yaml ]; then
+	export RIME_CONFIG=frontend/rime_settings.local.yaml
+else
+	export RIME_CONFIG=frontend/rime_settings.yaml
+fi
+
 # Start Uvicorn in the foreground, running the backend.
-uvicorn --reload --reload-dir ../rime --interface asgi3 $UVICORN_OPTS --factory rimeserver:create_app
+uvicorn --reload --reload-dir rime --interface asgi3 $UVICORN_OPTS --factory rime:rimeserver_create_app
 
