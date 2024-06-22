@@ -1,0 +1,21 @@
+[project]
+name = "RIME"
+version = "0.0.1"
+authors = [
+	{name = "RIME authors"},
+]
+description = "RIME is an application for viewing and subsetting mobile device data"
+readme = "README.md"
+classifiers = [
+	"Development Status :: 3 - Alpha",
+	"License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+	"Programming Language :: Python :: 3",
+]
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+include = ["rime", "rime.*"]
+
+[project.urls]
+homepage = "https://github.com/horizon-institute/rime"
+
