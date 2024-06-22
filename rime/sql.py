@@ -50,6 +50,14 @@ def sqlite3_connect(db_path, uri=False):
 
 
 def sqlite3_connect_filename(path, read_only=True):
+    if sys.platform == 'win32':
+        # If it's an absolute path, we need to add a leading slash to make it a URI
+        if re.match(r'^[a-zA-Z]:', path):
+            path = '/' + path
+
+        # Also, switch to forward slashes.
+        path = path.replace('\\', '/')
+
     params = "?mode=ro&immutable=1" if read_only else ""
     return sqlite3_connect(f"file://{path}{params}", uri=True)
 

@@ -690,23 +690,22 @@ RESOLVERS = [
 ]
 
 
-# Schema global and management
-def _get_schema():
-    schema_pathname = Path(__file__).parent / 'schema.graphql'
-    schema_txt = load_schema_from_path(str(schema_pathname))
-
-    return make_executable_schema(schema_txt, *RESOLVERS)
+schema = None
 
 
-schema = _get_schema()
-
-
-def reload_schema():
+def load_schema(schema_pathname: Path|None = None):
     """
-    Reload the schema from disk. Called by the development server when the schema changes.
+    Load the schema from disk. Must be invoked before GraphQL is used.
     """
     global schema
-    schema = _get_schema()
+
+    if schema_pathname is None:
+        schema_pathname = Path(__file__).parent / 'schema.graphql'
+
+    schema_txt = load_schema_from_path(str(schema_pathname))
+
+    schema = make_executable_schema(schema_txt, *RESOLVERS)
+    return schema
 
 
 # Querying

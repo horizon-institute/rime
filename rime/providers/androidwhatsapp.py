@@ -110,8 +110,8 @@ class AndroidWhatsApp(Provider):
     NAME = ANDROID_WHATSAPP
     FRIENDLY_NAME = ANDROID_WHATSAPP_FRIENDLY
 
-    MESSAGE_DB = os.path.join('data', 'data', 'com.whatsapp', 'databases', 'msgstore.db')  # chats
-    WA_DB = os.path.join('data', 'data', 'com.whatsapp', 'databases', 'wa.db')  # contacts
+    MESSAGE_DB = 'data/data/com.whatsapp/databases/msgstore.db'  # chats
+    WA_DB = 'data/data/com.whatsapp/databases/wa.db'  # contacts
 
     def __init__(self, fs):
         self.fs = fs
