@@ -8,7 +8,11 @@ import asyncio
 import concurrent.futures
 import mimetypes
 import os
-import resource
+from pathlib import Path
+try:
+    import resource
+except ImportError:
+    resource = None
 import urllib.parse
 import sys
 import signal
@@ -26,7 +30,7 @@ from ariadne.asgi import GraphQL as AriadneGraphQL
 from ariadne.asgi.handlers import GraphQLTransportWSHandler
 
 from rime import Rime
-from rime.graphql import schema, QueryContext
+from rime.graphql import load_schema, QueryContext
 from rime.config import Config
 
 
@@ -81,20 +85,31 @@ class ZippedStaticFiles:
         return StreamingResponse(self.zf.open(path), media_type=mime_type)
 
 
-def create_app():
-    # Increase number of open files, particularly relevant on macOS.
-    resource.setrlimit(resource.RLIMIT_NOFILE, (4096, 4096))
+def create_app(config_pathname=None, frontend_zip_pathname=None, frontend_hostport=None, schema_pathname=None):
+    if frontend_hostport and frontend_zip_pathname:
+        # frontend_zip_pathname is for production deploys; frontend_hostport is for dev.
+        raise ValueError("Please supply either frontend_zip_pathname or frontend_hostport, not both.")
+    elif not (frontend_hostport or frontend_zip_pathname):
+        # Allow env vars to override iff we didn't specify either argument.
+        frontend_hostport = os.environ.get('RIME_FRONTEND')
+        frontend_zip_pathname = os.environ.get('RIME_FRONTEND_ZIP')
+
+    if resource:
+        # Increase number of open files, particularly relevant on macOS.
+        resource.setrlimit(resource.RLIMIT_NOFILE, (4096, 4096))
 
     # Read config
-    frontend_host, frontend_port = os.environ.get('RIME_FRONTEND', 'localhost:3000').split(':')
-    for filename in (os.environ.get('RIME_CONFIG', 'rime_settings.local.yaml'), 'rime_settings.yaml'):
-        if os.path.exists(filename):
-            print("RIME is using the configuration file", filename)
-            rime_config = Config.from_file(filename)
-            break
-    else:
-        print("Configuration file not found. Create rime_settings.local.yaml or set RIME_CONFIG.")
-        sys.exit(1)
+    if not config_pathname:
+        for filename in (os.environ.get('RIME_CONFIG', 'rime_settings.local.yaml'), 'rime_settings.yaml'):
+            if os.path.exists(filename):
+                print("RIME is using the configuration file", filename)
+                config_pathname = filename
+                break
+        else:
+            print("Configuration file not found. Create rime_settings.local.yaml or set RIME_CONFIG.")
+            sys.exit(1)
+
+    rime_config = Config.from_file(config_pathname)
 
     bg_task_executor = concurrent.futures.ProcessPoolExecutor()
 
@@ -121,18 +136,20 @@ def create_app():
     rime = Rime.create(rime_config, enqueue_background_task)
     app = FastAPI()
 
-    # Add CORS middleware to allow the frontend to communicate with the backend on a different port.
-    cors_origins = [
-        f"http://{frontend_host}:{frontend_port}",
-    ]
+    if frontend_hostport:
+        # Add CORS middleware to allow the frontend to communicate with the backend on a different port.
+        frontend_host, frontend_port = frontend_hostport.split(':')
+        cors_origins = [
+            f"http://{frontend_host}:{frontend_port}",
+        ]
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     @app.on_event("startup")
     async def startup():
@@ -154,6 +171,8 @@ def create_app():
 
     def get_context_value(request, data):
         return QueryContext(rime)
+
+    schema = load_schema(Path(schema_pathname) if schema_pathname else None)
 
     graphql_app = AriadneGraphQL(
         schema,
@@ -177,9 +196,8 @@ def create_app():
     async def handle_graphql_ws(websocket: WebSocket):
         return await graphql_app.handle_websocket(websocket)
 
-    frontend_path = os.environ.get('RIME_FRONTEND_PATH')
-    if frontend_path:
-        app.get("/rime/{path:path}")(ZippedStaticFiles(frontend_path))
+    if frontend_zip_pathname:
+        app.get("/rime/{path:path}")(ZippedStaticFiles(frontend_zip_pathname))
 
         @app.get("/")
         async def redirect_to_frontend():
