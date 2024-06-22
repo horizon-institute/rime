@@ -38,7 +38,7 @@ function showPopover(message) {
 <template>
 	<div id="view">
 		<div id="left" class="search">
-			<img id="logo" src="logo.png" />
+			<img id="logo" src="/logo.png" />
 			<DeviceChooser id="deviceChooser"/>
 			<Search id="search"/>
 			<Subsetter id="subsetter" @showPopover="showPopover" />
