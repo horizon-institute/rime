@@ -19,6 +19,7 @@ from .devicesettings import DeviceSettings
 from .exceptions import NoPassphraseError, NotDecryptedError, WrongPassphraseError
 from .ensuredir import ensuredir
 from . import metadata
+from . import zipsupport
 from ..sql import Table, Query, get_field_indices, sqlite3_connect_filename as sqlite3_connect_with_regex_support
 
 log = getLogger(__name__)
@@ -300,29 +301,7 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
     """
     Zipped filesystem of an iOS device. Currently supports only read mode
     for the data.
-
-    The class assumes there is only one directory in the .zip file
-    and all the other files and directories are located withn that directory.
-
-        file.zip
-            |- main_dir
-                |- Manifest.db
-                |- Info.plist
-                |- 7c
-                    |- 7c7fba66680ef796b916b067077cc246adacf01d
     """
-
-    @staticmethod
-    def get_main_dir(zp: zipfile.ZipFile) -> zipfile.Path:
-        """
-        Get the main directory from within the zip file. The zip file
-        should contain one directory and all other files should be in
-        that directory.
-        """
-        root = zipfile.Path(zp)
-        main_dir, = root.iterdir()
-        return main_dir
-
     def __init__(self, id_: str, root: str, metadata_db_path: str):
         self.id_ = id_
 
@@ -336,12 +315,12 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
 
         with zipfile.ZipFile(self.root) as zp:
             # get the main directory contained in the .zip container file
-            main_dir = self.get_main_dir(zp)
+            main_dir = zipsupport.get_zipfile_main_dir(zp)
 
-            with zp.open(os.path.join(main_dir.name, 'Manifest.db')) as zf:
+            with zp.open(main_dir / 'Manifest.db') as zf:
                 self.temp_manifest.write(zf.read())
 
-            with zp.open(os.path.join(main_dir.name, '_rime_settings.db')) as zf:
+            with zp.open(main_dir / '_rime_settings.db') as zf:
                 self.temp_settings.write(zf.read())
 
         self.manifest = sqlite3_connect_with_regex_support(self.temp_manifest.name, read_only=True)
@@ -360,10 +339,10 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
 
         with zipfile.ZipFile(path) as zp:
             # get the main directory contained in the .zip container file
-            main_dir = cls.get_main_dir(zp)
+            main_dir = zipsupport.get_zipfile_main_dir(zp)
             return (
-                zipfile.Path(zp, os.path.join(main_dir.name, 'Manifest.db')).exists()
-                and zipfile.Path(zp, os.path.join(main_dir.name, 'Info.plist')).exists()
+                zipfile.Path(zp, main_dir / 'Manifest.db').exists()
+                and zipfile.Path(zp, main_dir / 'Info.plist').exists()
             )
 
     @classmethod
@@ -388,22 +367,22 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         # contains the `real_path
         with zipfile.ZipFile(self.root) as zp:
             # get the main directory contained in the .zip container file
-            main_dir = self.get_main_dir(zp)
-            return zipfile.Path(zp, os.path.join(main_dir.name, real_path)).exists()
+            main_dir = zipsupport.get_zipfile_main_dir(zp)
+            return zipfile.Path(zp, main_dir.name / real_path).exists()
 
     def getsize(self, path) -> int:
         with zipfile.ZipFile(self.root) as zp:
             # get the main directory contained in the .zip container file
-            main_dir = self.get_main_dir(zp)
-            return zp.getinfo(os.path.join(str(main_dir), self._converter.get_hashed_pathname(path))).file_size
+            main_dir = zipsupport.get_zipfile_main_dir(zp)
+            return zp.getinfo(main_dir / self._converter.get_hashed_pathname(path)).file_size
 
     def ios_open_raw(self, path, mode):
         # TODO: mode
         tmp_copy = tempfile.NamedTemporaryFile(mode='w+b')
         with zipfile.ZipFile(self.root) as zp:
             # get the main directory contained in the .zip container file
-            main_dir = self.get_main_dir(zp)
-            with zp.open(os.path.join(main_dir.name, path)) as zf:
+            main_dir = zipsupport.get_zipfile_main_dir(zp)
+            with zp.open(main_dir / path) as zf:
                 tmp_copy.write(zf.read())
         return tmp_copy
 
@@ -418,8 +397,8 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
 
         with zipfile.ZipFile(self.root) as zp:
             # get the main directory contained in the .zip container file
-            main_dir = self.get_main_dir(zp)
-            with zp.open(os.path.join(main_dir.name, self._converter.get_hashed_pathname(path))) as zf:
+            main_dir = zipsupport.get_zipfile_main_dir(zp)
+            with zp.open(main_dir / self._converter.get_hashed_pathname(path)) as zf:
                 tmp_copy.write(zf.read())
 
         log.debug(f"iOS connecting to {tmp_copy.name}")
@@ -435,8 +414,8 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         # for persistent settings preferenses
         with zipfile.ZipFile(self.root, 'w') as zp:
             # get the main directory contained in the .zip container file
-            main_dir = self.get_main_dir(zp)
-            with zp.open(os.path.join(str(main_dir), '_rime_settings.db'), 'w') as zf:
+            main_dir = zipsupport.get_zipfile_main_dir(zp)
+            with zp.open(main_dir / '_rime_settings.db', 'w') as zf:
                 zf.write(self.temp_settings.read())
 
     def is_locked(self) -> bool:

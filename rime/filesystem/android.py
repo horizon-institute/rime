@@ -11,6 +11,7 @@ import fs.osfs
 from .base import DeviceFilesystem
 from .devicesettings import DeviceSettings
 from .fslibfilesystem import FSLibFilesystem
+from . import zipsupport
 
 
 class AndroidDeviceFilesystem(DeviceFilesystem):
@@ -88,17 +89,6 @@ class AndroidZippedDeviceFilesystem(DeviceFilesystem):
     Zipped filesystem of an Android device. Currently supports only read mode
     for the data.
 
-    The class assumes that there is one directory in the .zip file
-    and all the other files and directories are located withn that directory.
-
-        file.zip
-            |- main_dir
-                |- _rime_settings.db
-                |- sdcard
-                    |- ...
-                |- data
-                    |- ...
-
     The contents of the .zip file are extracted in a temporary directory
     and then the (only) directory from within the temporary directory
     (the `main_dir`) is used to instantiate a filesystem. All queries
@@ -112,8 +102,8 @@ class AndroidZippedDeviceFilesystem(DeviceFilesystem):
         self.temp_root = tempfile.TemporaryDirectory()
 
         with zipfile.ZipFile(root) as zp:
+            main_dir = zipsupport.get_zipfile_main_dir(zp)
             zp.extractall(path=self.temp_root.name)
-            main_dir, = zipfile.Path(zp).iterdir()
 
         # instantiate a filesystem from the temporary directory
         self._fs = fs.osfs.OSFS(os.path.join(self.temp_root.name, main_dir.name))
@@ -127,8 +117,8 @@ class AndroidZippedDeviceFilesystem(DeviceFilesystem):
 
         with zipfile.ZipFile(path) as zp:
             # get the main directory contained in the .zip container file
-            main_dir, = zipfile.Path(zp).iterdir()
-            return zipfile.Path(zp, os.path.join(main_dir.name, 'data', 'data', 'android/')).exists()
+            main_dir = zipsupport.get_zipfile_main_dir(zp)
+            return (main_dir / 'data' / 'data' / 'android').exists()
 
     @classmethod
     def create(cls, id_: str, root: str, metadata_db_path: str, template: Optional['DeviceFilesystem'] = None)\
