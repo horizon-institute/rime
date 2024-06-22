@@ -3,7 +3,7 @@ import importlib
 import os
 from typing import Callable
 
-from ruamel.yaml import YAML
+from yaml import load as load_yaml, Loader
 
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
 
@@ -31,9 +31,8 @@ class Plugin:
 
 def load_plugin(category, name):
     plugin_dir = os.path.join(BASE_PATH, category)
-    yaml = YAML()
     with open(os.path.join(plugin_dir, name, 'plugin.yaml')) as h:
-        config = yaml.load(h)
+        config = load_yaml(h, Loader=Loader)
 
     module_name, func_name = config['entrypoint'].rsplit('.', 1)
 

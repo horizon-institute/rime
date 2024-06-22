@@ -1,6 +1,7 @@
 import os.path
+import pathlib
 
-from ruamel.yaml import YAML
+from yaml import load as load_yaml, Loader
 
 
 class Config:
@@ -13,12 +14,11 @@ class Config:
 
     @classmethod
     def from_file(cls, filename):
-        yaml = YAML(typ='safe')
-
         with open(filename) as h:
-            config = yaml.load(h)
-            base_path = os.path.abspath(os.path.dirname(filename))
-            return cls(config, base_path)
+            config = load_yaml(h, Loader=Loader)
+
+        base_path = os.path.abspath(os.path.dirname(filename))
+        return cls(config, base_path)
 
     def __getitem__(self, key):
         return self.yaml[key]
@@ -31,4 +31,6 @@ class Config:
         for keypart in key.split('.'):
             val = val[keypart]
 
-        return os.path.join(self.base_path, val)
+        val = pathlib.PurePosixPath(val)
+
+        return pathlib.Path(self.base_path) / val
