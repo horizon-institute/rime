@@ -7,7 +7,6 @@ SMS / MMS for Android
 """
 import datetime
 from dataclasses import dataclass
-import os.path
 
 from ..provider import Provider
 from .providerutils import LazyContactProvider, LazyContactProviderContacts
@@ -31,7 +30,7 @@ class AndroidTelephony(Provider, LazyContactProvider):
     NAME = ANDROID_TELEPHONY
     FRIENDLY_NAME = ANDROID_TELEPHONY_FRIENDLY
 
-    MMSSMS_DB = os.path.join('data', 'data', 'com.android.providers.telephony', 'databases', 'mmssms.db')
+    MMSSMS_DB = 'data/data/com.android.providers.telephony/databases/mmssms.db'
 
     def __init__(self, fs):
         self.fs = fs
