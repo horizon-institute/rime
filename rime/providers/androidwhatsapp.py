@@ -115,12 +115,12 @@ class AndroidWhatsApp(Provider):
 
     def __init__(self, fs):
         self.fs = fs
-        self.msgdb = fs.sqlite3_connect(self.MESSAGE_DB, read_only=True)
-        self.wadb = fs.sqlite3_connect(self.WA_DB, read_only=True)
 
-    def __del__(self):
-        self.msgdb.close()
-        self.wadb.close()
+    def _msgdb(self):
+        return self.fs.sqlite3_connect(self.MESSAGE_DB, read_only=True)
+
+    def _wadb(self):
+        return self.fs.sqlite3_connect(self.WA_DB, read_only=True)
 
     def _load_contacts(self):
         """
@@ -141,36 +141,37 @@ class AndroidWhatsApp(Provider):
         contacts_by_jid = {}
         CONTACTS_BY_ID[self.fs.id_] = {}
 
-        for row in self.wadb.execute(str(query)):
-            jid = row[fields['jid']]
-            wa_contact = WhatsappContact(
-                id_=row[fields['_id']],
-                jid=jid,
-                number=row[fields['number']],
-                display_name=row[fields['display_name']],
-                jid_contacts=[]
-            )
-            new_contact = Contact(
-                local_id=f'{jid}',
-                device_id=self.fs.id_,
-                name=Name(),
-                providerName=self.NAME,
-                providerFriendlyName=self.FRIENDLY_NAME,
-                provider_data=wa_contact
-            )
-            number = row[fields['number']]
-            # It's possible for number to be null, in which case we use the first part of the jid.
-            if number is None:
-                jid_start = jid.split('@')[0]
-                number = jid_start if jid_start.startswith('+') else '+' + jid_start
+        with self._wadb() as wadb:
+            for row in wadb.execute(str(query)):
+                jid = row[fields['jid']]
+                wa_contact = WhatsappContact(
+                    id_=row[fields['_id']],
+                    jid=jid,
+                    number=row[fields['number']],
+                    display_name=row[fields['display_name']],
+                    jid_contacts=[]
+                )
+                new_contact = Contact(
+                    local_id=f'{jid}',
+                    device_id=self.fs.id_,
+                    name=Name(),
+                    providerName=self.NAME,
+                    providerFriendlyName=self.FRIENDLY_NAME,
+                    provider_data=wa_contact
+                )
+                number = row[fields['number']]
+                # It's possible for number to be null, in which case we use the first part of the jid.
+                if number is None:
+                    jid_start = jid.split('@')[0]
+                    number = jid_start if jid_start.startswith('+') else '+' + jid_start
 
-            new_contact.name.first = row[fields['given_name']]
-            new_contact.name.last = row[fields['family_name']]
-            new_contact.name.display = row[fields['display_name']] or row[fields['wa_name']]
-            new_contact.phone = number
+                new_contact.name.first = row[fields['given_name']]
+                new_contact.name.last = row[fields['family_name']]
+                new_contact.name.display = row[fields['display_name']] or row[fields['wa_name']]
+                new_contact.phone = number
 
-            contacts_by_jid[jid] = new_contact
-            CONTACTS_BY_ID[self.fs.id_][new_contact.local_id] = new_contact
+                contacts_by_jid[jid] = new_contact
+                CONTACTS_BY_ID[self.fs.id_][new_contact.local_id] = new_contact
 
         CONTACTS_BY_JID_ROW_ID[self.fs.id_] = {}
 
@@ -180,32 +181,33 @@ class AndroidWhatsApp(Provider):
 
         fields = get_field_indices(query)
 
-        for row in self.msgdb.execute(str(query)):
-            jid = row[fields['user']] + '@' + row[fields['server']]
-            contact = contacts_by_jid.get(jid, None)
-            if not contact:
-                # No corresponding wa_contact. But this IS mentioned in jids and MAY be referenced, so create
-                # something.
-                contact = Contact(
-                    local_id=jid,
-                    device_id=self.fs.id_,
-                    name=Name(),
-                    providerName=self.NAME,
-                    provider_data=WhatsappContact(id_=-1, jid_contacts=[], jid=jid, number='', display_name='Unknown'),
-                    phone=row[fields['user']]
+        with self._msgdb() as msgdb:
+            for row in msgdb.execute(str(query)):
+                jid = row[fields['user']] + '@' + row[fields['server']]
+                contact = contacts_by_jid.get(jid, None)
+                if not contact:
+                    # No corresponding wa_contact. But this IS mentioned in jids and MAY be referenced, so create
+                    # something.
+                    contact = Contact(
+                        local_id=jid,
+                        device_id=self.fs.id_,
+                        name=Name(),
+                        providerName=self.NAME,
+                        provider_data=WhatsappContact(id_=-1, jid_contacts=[], jid=jid, number='', display_name='Unknown'),
+                        phone=row[fields['user']]
+                    )
+                    contacts_by_jid[jid] = contact
+
+                wa_jid = WhatsappJid(
+                    id_=row[fields['_id']],
+                    name=row[fields['user']],
+                    typ=row[fields['type']],
+                    raw_string=row[fields['raw_string']]
                 )
-                contacts_by_jid[jid] = contact
 
-            wa_jid = WhatsappJid(
-                id_=row[fields['_id']],
-                name=row[fields['user']],
-                typ=row[fields['type']],
-                raw_string=row[fields['raw_string']]
-            )
+                contact.provider_data.jid_contacts.append(wa_jid)
 
-            contact.provider_data.jid_contacts.append(wa_jid)
-
-            CONTACTS_BY_JID_ROW_ID[self.fs.id_][row[fields['_id']]] = contact
+                CONTACTS_BY_JID_ROW_ID[self.fs.id_][row[fields['_id']]] = contact
 
     def _media_path(self, local_id):
         # TODO media is stored on the SD card, which isn't fixed.
@@ -218,7 +220,9 @@ class AndroidWhatsApp(Provider):
             .select('mime_type') \
             .where(media_table.file_path == local_id)
 
-        row = self.msgdb.execute(str(query)).fetchone()
+        with self._msgdb() as msgdb:
+            row = msgdb.execute(str(query)).fetchone()
+
         if not row:
             raise ValueError(f'No media found for local id {local_id}')
 
@@ -257,9 +261,10 @@ class AndroidWhatsApp(Provider):
             GROUP_USERS[self.fs.id_][group_jid] = []
             GROUP_PARTICIPANT_USER_IDS[self.fs.id_][group_jid] = []
 
-            for row in self.msgdb.execute(str(query)):
-                GROUP_PARTICIPANT_USER_IDS[self.fs.id_][group_jid].append(row[fields['_id']])
-                GROUP_USERS[self.fs.id_][group_jid].append(row[fields['user_jid_row_id']])
+            with self._msgdb() as msgdb:
+                for row in msgdb.execute(str(query)):
+                    GROUP_PARTICIPANT_USER_IDS[self.fs.id_][group_jid].append(row[fields['_id']])
+                    GROUP_USERS[self.fs.id_][group_jid].append(row[fields['user_jid_row_id']])
 
         contacts = []
         all_contacts = CONTACTS_BY_JID_ROW_ID[self.fs.id_]
@@ -285,7 +290,8 @@ class AndroidWhatsApp(Provider):
 
         fields = get_field_indices(query)
 
-        row = self.msgdb.execute(str(query)).fetchone()
+        with self._msgdb() as msgdb:
+            row = msgdb.execute(str(query)).fetchone()
         if not row:
             return None
 
@@ -361,61 +367,62 @@ class AndroidWhatsApp(Provider):
         query = self._construct_query(filter_)
         fields = get_field_indices(query)
 
-        for row in self.msgdb.execute(str(query)):
-            # WhatsApp's contact storage method looks like it's changed over time. The following is guesswork:
-            # - If message.sender_jid_row_id is 0, its a group chat message. You can find the
-            #   sender by looking at message_details.author_device_jid.
-            # - If message.sender_jid_row_id is NOT 0, it's a private chat message and the sender
-            #   is as indicated by sender_jid_row_id.
+        with self._msgdb() as msgdb:
+            for row in msgdb.execute(str(query)):
+                # WhatsApp's contact storage method looks like it's changed over time. The following is guesswork:
+                # - If message.sender_jid_row_id is 0, its a group chat message. You can find the
+                #   sender by looking at message_details.author_device_jid.
+                # - If message.sender_jid_row_id is NOT 0, it's a private chat message and the sender
+                #   is as indicated by sender_jid_row_id.
 
-            # Find the sender.
-            if row[fields['from_me']]:
-                sender = device.device_operator_contact
-            elif row[fields['sender_jid_row_id']] == 0:
-                # Group chat.
-                author_device_jid = row[fields['author_device_jid']]
-                if author_device_jid:
-                    sender = self._get_contact(author_device_jid)  # may be None
+                # Find the sender.
+                if row[fields['from_me']]:
+                    sender = device.device_operator_contact
+                elif row[fields['sender_jid_row_id']] == 0:
+                    # Group chat.
+                    author_device_jid = row[fields['author_device_jid']]
+                    if author_device_jid:
+                        sender = self._get_contact(author_device_jid)  # may be None
+                    else:
+                        sender = None
                 else:
-                    sender = None
-            else:
-                # Private chat.
-                sender = self._get_contact(row[fields['sender_jid_row_id']])  # may be None
+                    # Private chat.
+                    sender = self._get_contact(row[fields['sender_jid_row_id']])  # may be None
 
-            if sender is None:
-                sender = device.unknown_contact
+                if sender is None:
+                    sender = device.unknown_contact
 
-            # Store session info.
-            if row[fields['chat_row_id']] not in wa_sessions:
-                wa_sessions[row[fields['chat_row_id']]] = self._create_wa_session(row[fields['chat_row_id']])
+                # Store session info.
+                if row[fields['chat_row_id']] not in wa_sessions:
+                    wa_sessions[row[fields['chat_row_id']]] = self._create_wa_session(row[fields['chat_row_id']])
 
-            # Store DB-specific information to re-create the database rows later if we're subsetting.
-            wa_message_event = WhatsappMessageEvent(
-                message_row_id=row[fields['_id']],
-                chat_row_id=row[fields['chat_row_id']],
-            )
+                # Store DB-specific information to re-create the database rows later if we're subsetting.
+                wa_message_event = WhatsappMessageEvent(
+                    message_row_id=row[fields['_id']],
+                    chat_row_id=row[fields['chat_row_id']],
+                )
 
-            if row[fields['message_type']] in MEDIA_MESSAGE_TYPES:
-                # Media message.
-                media = Media(
-                    mime_type=row[fields['mime_type']],
-                    local_id=row[fields['file_path']])
-            else:
-                # Text message.
-                media = None
+                if row[fields['message_type']] in MEDIA_MESSAGE_TYPES:
+                    # Media message.
+                    media = Media(
+                        mime_type=row[fields['mime_type']],
+                        local_id=row[fields['file_path']])
+                else:
+                    # Text message.
+                    media = None
 
-            yield MessageEvent(
-                id_=row[fields['_id']],
-                session_id=str(row[fields['chat_row_id']]),
-                session=wa_sessions[row[fields['chat_row_id']]],
-                timestamp=_timestamp_to_datetime(row[fields['timestamp']]),
-                provider=self,
-                provider_data=wa_message_event,
-                text=row[fields['text_data']],
-                from_me=bool(row[fields['from_me']]),
-                sender=sender,
-                media=media,
-            )
+                yield MessageEvent(
+                    id_=row[fields['_id']],
+                    session_id=str(row[fields['chat_row_id']]),
+                    session=wa_sessions[row[fields['chat_row_id']]],
+                    timestamp=_timestamp_to_datetime(row[fields['timestamp']]),
+                    provider=self,
+                    provider_data=wa_message_event,
+                    text=row[fields['text_data']],
+                    from_me=bool(row[fields['from_me']]),
+                    sender=sender,
+                    media=media,
+                )
 
     def search_contacts(self, filter_):
         self._load_contacts()
@@ -454,54 +461,55 @@ class AndroidWhatsApp(Provider):
         Create a WhatsApp subset using the provided events and contacts.
         """
         # Copy the contacts
-        with subsetter.db_subset(src_conn=self.wadb, new_db_pathname=self.WA_DB) as subset_wadb, \
-                subsetter.db_subset(src_conn=self.msgdb, new_db_pathname=self.MESSAGE_DB) as subset_msgdb:
+        with self._wadb() as wadb, self._msgdb() as msgdb:
+            with subsetter.db_subset(src_conn=wadb, new_db_pathname=self.WA_DB) as subset_wadb, \
+                    subsetter.db_subset(src_conn=msgdb, new_db_pathname=self.MESSAGE_DB) as subset_msgdb:
 
-            rows_wa_contacts = subset_wadb.row_subset("wa_contacts", "_id")
-            rows_wa_contacts.update(contact.provider_data.id_ for contact in contacts)
+                rows_wa_contacts = subset_wadb.row_subset("wa_contacts", "_id")
+                rows_wa_contacts.update(contact.provider_data.id_ for contact in contacts)
 
-            # Copy session participants
-            rows_group_participant_user = subset_msgdb.row_subset("group_participant_user", "_id")
+                # Copy session participants
+                rows_group_participant_user = subset_msgdb.row_subset("group_participant_user", "_id")
 
-            # Copy events
-            rows_message = subset_msgdb.row_subset("message", "_id")
-            rows_message_media = subset_msgdb.row_subset("message_media", "message_row_id")
-            rows_message_details = subset_msgdb.row_subset("message_details", "message_row_id")
-            rows_jid = subset_msgdb.row_subset("jid", "_id")
-            rows_chat = subset_msgdb.row_subset("chat", "_id")
+                # Copy events
+                rows_message = subset_msgdb.row_subset("message", "_id")
+                rows_message_media = subset_msgdb.row_subset("message_media", "message_row_id")
+                rows_message_details = subset_msgdb.row_subset("message_details", "message_row_id")
+                rows_jid = subset_msgdb.row_subset("jid", "_id")
+                rows_chat = subset_msgdb.row_subset("chat", "_id")
 
-            for event in events:
-                # Reject if it's not one of ours.
-                if not isinstance(event, MessageEvent) or event.provider.NAME != self.NAME:
-                    continue
+                for event in events:
+                    # Reject if it's not one of ours.
+                    if not isinstance(event, MessageEvent) or event.provider.NAME != self.NAME:
+                        continue
 
-                wa_message = event.provider_data
+                    wa_message = event.provider_data
 
-                rows_message.add(wa_message.message_row_id)
-                if event.sender and event.sender.provider_data:
-                    rows_jid.update(jid_contact.id_ for jid_contact in event.sender.provider_data.jid_contacts)
+                    rows_message.add(wa_message.message_row_id)
+                    if event.sender and event.sender.provider_data:
+                        rows_jid.update(jid_contact.id_ for jid_contact in event.sender.provider_data.jid_contacts)
 
-                if event.session:
-                    wa_session = event.session.provider_data
-                    rows_group_participant_user.update(wa_session.group_participant_user_ids)
-                    if wa_session.group_user_id:
-                        rows_wa_contacts.add(wa_session.group_user_id)
-                    if wa_session.group_jid_row_id:
-                        rows_jid.add(wa_session.group_jid_row_id)
+                    if event.session:
+                        wa_session = event.session.provider_data
+                        rows_group_participant_user.update(wa_session.group_participant_user_ids)
+                        if wa_session.group_user_id:
+                            rows_wa_contacts.add(wa_session.group_user_id)
+                        if wa_session.group_jid_row_id:
+                            rows_jid.add(wa_session.group_jid_row_id)
 
-                rows_message_details.add(wa_message.message_row_id)
-                rows_chat.add(wa_message.chat_row_id)
-                rows_message_media.add(wa_message.message_row_id)
+                    rows_message_details.add(wa_message.message_row_id)
+                    rows_chat.add(wa_message.chat_row_id)
+                    rows_message_media.add(wa_message.message_row_id)
 
-            # copy media by copying each named file.
-            media_table = Table('message_media')
-            query = Query.from_(media_table) \
-                .select('file_path') \
-                .where(media_table.message_row_id.isin(rows_message_media.rows))
+                # copy media by copying each named file.
+                media_table = Table('message_media')
+                query = Query.from_(media_table) \
+                    .select('file_path') \
+                    .where(media_table.message_row_id.isin(rows_message_media.rows))
 
-            for row in self.msgdb.execute(query.get_sql()):
-                pathname = self._media_path(row[0])
-                subsetter.copy_file(self.fs.open(pathname), pathname)
+                for row in msgdb.execute(query.get_sql()):
+                    pathname = self._media_path(row[0])
+                    subsetter.copy_file(self.fs.open(pathname), pathname)
 
     def all_files(self):
         # TODO

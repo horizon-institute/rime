@@ -62,10 +62,9 @@ class AndroidContacts(Provider):
 
     def __init__(self, fs):
         self.fs = fs
-        self.conn = fs.sqlite3_connect(self.DB_PATH, read_only=True)
 
-    def __del__(self):
-        self.conn.close()
+    def _db(self):
+        return self.fs.sqlite3_connect(self.DB_PATH, read_only=True)
 
     def is_version_compatible(self):
         # Android 10:
@@ -94,27 +93,28 @@ class AndroidContacts(Provider):
         fields = get_field_indices(query)
         contacts = {}  # Indexed by contact ID
 
-        for row in self.conn.execute(str(query)):
-            contact_id = row[fields['_id']]
-            raw_contact_id = row[fields['name_raw_contact_id']]
-            mime_type_id = row[fields['mimetype_id']]
-            data = row[fields['data1']]
+        with self._db() as conn:
+            for row in conn.execute(str(query)):
+                contact_id = row[fields['_id']]
+                raw_contact_id = row[fields['name_raw_contact_id']]
+                mime_type_id = row[fields['mimetype_id']]
+                data = row[fields['data1']]
 
-            if contact_id not in contacts:
-                provider_data = AndroidContact(contact_row_id=contact_id, raw_contact_row_ids=set())
-                contacts[contact_id] = Contact(
-                    local_id=contact_id,
-                    device_id=self.fs.id_,
-                    name=Name(),
-                    providerName=self.NAME,
-                    providerFriendlyName=self.FRIENDLY_NAME,
-                    provider_data=provider_data
-                )
+                if contact_id not in contacts:
+                    provider_data = AndroidContact(contact_row_id=contact_id, raw_contact_row_ids=set())
+                    contacts[contact_id] = Contact(
+                        local_id=contact_id,
+                        device_id=self.fs.id_,
+                        name=Name(),
+                        providerName=self.NAME,
+                        providerFriendlyName=self.FRIENDLY_NAME,
+                        provider_data=provider_data
+                    )
 
-            contacts[contact_id].provider_data.raw_contact_row_ids.add(raw_contact_id)
+                contacts[contact_id].provider_data.raw_contact_row_ids.add(raw_contact_id)
 
-            contact_field_name = MIMETYPES[mime_type_id_to_name[mime_type_id]]
-            setattr(contacts[contact_id], contact_field_name, data)
+                contact_field_name = MIMETYPES[mime_type_id_to_name[mime_type_id]]
+                setattr(contacts[contact_id], contact_field_name, data)
 
         return list(filter_contacts(contacts_filter, contacts.values()))
 
@@ -138,19 +138,20 @@ class AndroidContacts(Provider):
     }
 
     def subset(self, subsetter, events: Iterable[Event], contacts: Iterable[Contact]):
-        with subsetter.db_subset(src_conn=self.conn, new_db_pathname=self.DB_PATH) as db_subset:
-            rows_contacts = db_subset.row_subset('contacts', '_id')
-            rows_raw_contacts = db_subset.row_subset('raw_contacts', '_id')
-            rows_data = db_subset.row_subset('data', 'raw_contact_id')
-            db_subset.complete_table('mimetypes')
+        with self._db() as conn:
+            with subsetter.db_subset(src_conn=conn, new_db_pathname=self.DB_PATH) as db_subset:
+                rows_contacts = db_subset.row_subset('contacts', '_id')
+                rows_raw_contacts = db_subset.row_subset('raw_contacts', '_id')
+                rows_data = db_subset.row_subset('data', 'raw_contact_id')
+                db_subset.complete_table('mimetypes')
 
-            for contact in contacts:
-                if contact.providerName != self.NAME:
-                    continue
+                for contact in contacts:
+                    if contact.providerName != self.NAME:
+                        continue
 
-                rows_contacts.add(contact.local_id)
-                rows_raw_contacts.update(contact.provider_data.raw_contact_row_ids)
-                rows_data.update(contact.provider_data.raw_contact_row_ids)
+                    rows_contacts.add(contact.local_id)
+                    rows_raw_contacts.update(contact.provider_data.raw_contact_row_ids)
+                    rows_data.update(contact.provider_data.raw_contact_row_ids)
 
     def all_files(self):
         # TODO
@@ -171,8 +172,9 @@ class AndroidContacts(Provider):
             fields = get_field_indices(query)
             result = {}
 
-            for row in self.conn.execute(str(query)):
-                result[row[fields['_id']]] = row[fields['mimetype']]
+            with self._db() as conn:
+                for row in conn.execute(str(query)):
+                    result[row[fields['_id']]] = row[fields['mimetype']]
 
             MIMETYPE_TO_ID[fs_id] = result
 

@@ -34,9 +34,11 @@ class AndroidTelephony(Provider, LazyContactProvider):
 
     def __init__(self, fs):
         self.fs = fs
-        self.db = fs.sqlite3_connect(self.MMSSMS_DB, read_only=True)
         self.contacts = LazyContactProviderContacts(self)
         self.sessions = {}
+
+    def _db(self):
+        return self.fs.sqlite3_connect(self.MMSSMS_DB, read_only=True)
 
     def search_events(self, device, filter_):
         """
@@ -54,29 +56,30 @@ class AndroidTelephony(Provider, LazyContactProvider):
 
         fields = get_field_indices(query)
 
-        for row in self.db.execute(query.get_sql()):
-            session = self._find_session(row[fields['thread_id']], row[fields['address_id']])
+        with self._db() as conn:
+            for row in conn.execute(query.get_sql()):
+                session = self._find_session(row[fields['thread_id']], row[fields['address_id']])
 
-            provider_data = AtMessage(
-                threads_table_id=row[fields['thread_id']],
-                address_table_id=row[fields['address_id']],
-            )
+                provider_data = AtMessage(
+                    threads_table_id=row[fields['thread_id']],
+                    address_table_id=row[fields['address_id']],
+                )
 
-            sender = device.device_operator_contact \
-                if row[fields['type']] == TYPE_TO_ME \
-                else self.contacts[row[fields['address_id']]]
+                sender = device.device_operator_contact \
+                    if row[fields['type']] == TYPE_TO_ME \
+                    else self.contacts[row[fields['address_id']]]
 
-            yield MessageEvent(
-                id_=row[fields['sms_id']],
-                session_id=session.local_id,
-                session=session,
-                from_me=row[fields['type']] == TYPE_FROM_ME,
-                timestamp=self._timestamp_to_datetime(row[fields['date']]),
-                provider=self,
-                provider_data=provider_data,
-                text=row[fields['body']],
-                sender=sender,
-            )
+                yield MessageEvent(
+                    id_=row[fields['sms_id']],
+                    session_id=session.local_id,
+                    session=session,
+                    from_me=row[fields['type']] == TYPE_FROM_ME,
+                    timestamp=self._timestamp_to_datetime(row[fields['date']]),
+                    provider=self,
+                    provider_data=provider_data,
+                    text=row[fields['body']],
+                    sender=sender,
+                )
 
     def _timestamp_to_datetime(self, timestamp):
         # Milliseconds since the epoch
@@ -119,18 +122,19 @@ class AndroidTelephony(Provider, LazyContactProvider):
         """
         Create a subset using the given events and contacts.
         """
-        with subsetter.db_subset(src_conn=self.db, new_db_pathname=self.MMSSMS_DB) as subset_db:
-            rows_sms = subset_db.row_subset("sms", "_id")
-            rows_threads = subset_db.row_subset('threads', '_id')
-            rows_address = subset_db.row_subset('canonical_addresses', '_id')
+        with self._db() as conn:
+            with subsetter.db_subset(src_conn=conn, new_db_pathname=self.MMSSMS_DB) as subset_db:
+                rows_sms = subset_db.row_subset("sms", "_id")
+                rows_threads = subset_db.row_subset('threads', '_id')
+                rows_address = subset_db.row_subset('canonical_addresses', '_id')
 
-            rows_address.update(
-                contact.local_id for contact in contacts if contact.providerName == self.NAME
-            )
-            rows_threads.update(
-                event.provider_data.threads_table_id for event in events if event.provider.NAME == self.NAME
-            )
-            rows_sms.update(event.id_ for event in events if event.provider.NAME == self.NAME)
+                rows_address.update(
+                    contact.local_id for contact in contacts if contact.providerName == self.NAME
+                )
+                rows_threads.update(
+                    event.provider_data.threads_table_id for event in events if event.provider.NAME == self.NAME
+                )
+                rows_sms.update(event.id_ for event in events if event.provider.NAME == self.NAME)
 
     def all_files(self):
         # TODO
@@ -151,8 +155,9 @@ class AndroidTelephony(Provider, LazyContactProvider):
             .from_(address_table)\
             .select(address_table._id, address_table.address)
 
-        for row in self.db.execute(query.get_sql()):
-            yield {'_id': str(row[0]), 'address': row[1]}
+        with self._db() as conn:
+            for row in conn.execute(query.get_sql()):
+                yield {'_id': str(row[0]), 'address': row[1]}
 
     def contact_create(self, _id, address):
         return Contact(

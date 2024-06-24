@@ -310,27 +310,46 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         # to be able to open the zipfile
         self.root = root
 
-        # keep a reference to the tempfile in the object
-        self.temp_manifest = tempfile.NamedTemporaryFile(mode='w+b')
-        self.temp_settings = tempfile.NamedTemporaryFile(mode='w+b')
+        # keep a reference to the temp file in the object
+        self.temp_manifest_pathname = zipsupport.temp_file_name()
+        self.temp_settings_pathname = zipsupport.temp_file_name()
 
         with zipfile.ZipFile(self.root) as zp:
             # get the main directory contained in the .zip container file
             main_dir = zipsupport.get_zipfile_main_dir(zp)
 
-            with (main_dir / 'Manifest.db').open('rb') as zf:
-                self.temp_manifest.write(zf.read())
+            with (main_dir / 'Manifest.db').open('rb') as zf, open(self.temp_manifest_pathname, 'w+b') as h:
+                h.write(zf.read())
 
-            with (main_dir / '_rime_settings.db').open('rb') as zf:
-                self.temp_settings.write(zf.read())
+            with (main_dir / '_rime_settings.db').open('rb') as zf, open(self.temp_settings_pathname, 'w+b') as h:
+                h.write(zf.read())
 
-        self.manifest = sqlite3_connect_with_regex_support(self.temp_manifest.name, read_only=True)
+        self.manifest = sqlite3_connect_with_regex_support(self.temp_manifest_pathname, read_only=True)
         self.file_table = Table('Files')
 
-        settings_dir, settings_file = os.path.split(self.temp_settings.name)
+        settings_dir, settings_file = os.path.split(self.temp_settings_pathname)
         self._settings = DeviceSettings(settings_dir, settings_file)
         self._converter = _IosManifest(self.manifest)
         self._metadata = metadata.MetadataDb(metadata_db_path)
+
+    def __del__(self):
+        del self._converter
+
+        try:
+            self.manifest.close()
+        except:
+            pass
+
+        try:
+            del self._settings
+        except:
+            pass
+
+        for pathname in [self.temp_manifest_pathname, self.temp_settings_pathname]:
+            try:
+                os.remove(pathname)
+            except:
+                pass
 
     @classmethod
     def is_device_filesystem(cls, path) -> bool:
@@ -413,8 +432,8 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         with zipfile.ZipFile(self.root, 'w') as zp:
             # get the main directory contained in the .zip container file
             main_dir = zipsupport.get_zipfile_main_dir(zp)
-            with zp.open(str(main_dir / '_rime_settings.db'), 'w') as zf:
-                zf.write(self.temp_settings.read())
+            with (main_dir / '_rime_settings.db').open('wb') as zf, open(self.temp_settings_pathname, 'rb') as src_handle:
+                zf.write(src_handle.read())
 
     def is_locked(self) -> bool:
         return self._settings.is_locked()

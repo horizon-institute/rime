@@ -23,10 +23,9 @@ class IOSContacts(Provider):
 
     def __init__(self, fs):
         self.fs = fs
-        self.conn = fs.sqlite3_connect(self.DB_PATH, read_only=True)
 
-    def __del__(self):
-        self.conn.close()
+    def _db(self):
+        return self.fs.sqlite3_connect(self.DB_PATH, read_only=True)
 
     def is_version_compatible(self):
         return True
@@ -52,11 +51,31 @@ class IOSContacts(Provider):
 
         # We'll get several rows per contact.
         # These will be ordered by ROWID, so we should get all the values for one contact together.
-        for row in self.conn.execute(str(query)):
-            rowid = row[fields['ROWID']]
-            if rowid != prev_id and prev_id is not None:
-                # Moving on to new contact; return the last one
-                # with whatever we've found
+        with self._db() as conn:
+            for row in conn.execute(str(query)):
+                rowid = row[fields['ROWID']]
+                if rowid != prev_id and prev_id is not None:
+                    # Moving on to new contact; return the last one
+                    # with whatever we've found
+                    yield Contact(
+                        local_id=prev_id,
+                        device_id=self.fs.id_,
+                        providerName=self.NAME,
+                        providerFriendlyName=self.FRIENDLY_NAME,
+                        name=Name(first=first, last=last),
+                        phone=phone,
+                        email=email
+                    )
+                    email = phone = first = last = ""
+                first, last = row[fields['First']], row[fields['Last']]
+                prev_id = rowid
+                if row[fields['property']] == 3:
+                    phone = row[fields['value']]
+                if row[fields['property']] == 4:
+                    email = row[fields['value']]
+
+            # And when we get to the end of the query, we need to return the last one.
+            if prev_id is not None:
                 yield Contact(
                     local_id=prev_id,
                     device_id=self.fs.id_,
@@ -66,24 +85,6 @@ class IOSContacts(Provider):
                     phone=phone,
                     email=email
                 )
-                email = phone = first = last = ""
-            first, last = row[fields['First']], row[fields['Last']]
-            prev_id = rowid
-            if row[fields['property']] == 3:
-                phone = row[fields['value']]
-            if row[fields['property']] == 4:
-                email = row[fields['value']]
-        # And when we get to the end of the query, we need to return the last one.
-        if prev_id is not None:
-            yield Contact(
-                local_id=prev_id,
-                device_id=self.fs.id_,
-                providerName=self.NAME,
-                providerFriendlyName=self.FRIENDLY_NAME,
-                name=Name(first=first, last=last),
-                phone=phone,
-                email=email
-            )
 
     PII_FIELDS = {
         'sqlite3': {
@@ -96,14 +97,15 @@ class IOSContacts(Provider):
     }
 
     def subset(self, subsetter, events: Iterable[Event], contacts: Iterable[Contact]):
-        with subsetter.db_subset(src_conn=self.conn, new_db_pathname=self.DB_PATH) as subset_db:
-            abperson_rows = subset_db.row_subset('ABPerson', 'ROWID')
-            abmv_rows = subset_db.row_subset('ABMultiValue', 'record_id')
+        with self._db() as conn:
+            with subsetter.db_subset(src_conn=conn, new_db_pathname=self.DB_PATH) as subset_db:
+                abperson_rows = subset_db.row_subset('ABPerson', 'ROWID')
+                abmv_rows = subset_db.row_subset('ABMultiValue', 'record_id')
 
-            my_contact_ids = [contact.local_id for contact in contacts if contact.providerName == self.NAME]
+                my_contact_ids = [contact.local_id for contact in contacts if contact.providerName == self.NAME]
 
-            abperson_rows.update(my_contact_ids)
-            abmv_rows.update(my_contact_ids)
+                abperson_rows.update(my_contact_ids)
+                abmv_rows.update(my_contact_ids)
 
     def all_files(self):
         # TODO

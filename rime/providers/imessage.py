@@ -42,11 +42,10 @@ class IMessage(Provider, LazyContactProvider):
 
     def __init__(self, fs):
         self.fs = fs
-        self.conn = fs.sqlite3_connect(self.MESSAGE_DB, read_only=True)
         self.contacts = LazyContactProviderContacts(self)
 
-    def __del__(self):
-        self.conn.close()
+    def _db(self):
+        return self.fs.sqlite3_connect(self.MESSAGE_DB, read_only=True)
 
     @classmethod
     def _timestamp_to_datetime(cls, timestamp):
@@ -71,8 +70,9 @@ class IMessage(Provider, LazyContactProvider):
         fields = get_field_indices(query)
 
         contacts = []
-        for row in self.conn.execute(str(query)):
-            contacts.append(self.contacts[row[fields['ROWID']]])
+        with self._db() as conn:
+            for row in conn.execute(str(query)):
+                contacts.append(self.contacts[row[fields['ROWID']]])
 
         return MessageSession(
             local_id=chat_id,
@@ -102,27 +102,28 @@ class IMessage(Provider, LazyContactProvider):
 
         fields = get_field_indices(query)
 
-        for row in self.conn.execute(str(query)):
-            chat_id = row[fields['chat_id']]
-            if chat_id not in sessions:
-                sessions[chat_id] = self._create_session(chat_id)
+        with self._db() as conn:
+            for row in conn.execute(str(query)):
+                chat_id = row[fields['chat_id']]
+                if chat_id not in sessions:
+                    sessions[chat_id] = self._create_session(chat_id)
 
-            sender = device.device_operator_contact if row[fields['is_from_me']] else sessions[chat_id].participants[0]
+                sender = device.device_operator_contact if row[fields['is_from_me']] else sessions[chat_id].participants[0]
 
-            yield MessageEvent(
-                id_=row[fields['guid']],
-                session_id=chat_id,
-                session=sessions[chat_id],
-                from_me=bool(row[fields['is_from_me']]),
-                timestamp=self._timestamp_to_datetime(row[fields['date']]),
-                provider=self,
-                sender=sender,
-                provider_data=ImessageMessage(
-                    message_row_id=row[fields['ROWID']],
-                    chat_row_id=row[fields['chat_id']],
-                ),
-                text=row[fields['text']],
-            )
+                yield MessageEvent(
+                    id_=row[fields['guid']],
+                    session_id=chat_id,
+                    session=sessions[chat_id],
+                    from_me=bool(row[fields['is_from_me']]),
+                    timestamp=self._timestamp_to_datetime(row[fields['date']]),
+                    provider=self,
+                    sender=sender,
+                    provider_data=ImessageMessage(
+                        message_row_id=row[fields['ROWID']],
+                        chat_row_id=row[fields['chat_id']],
+                    ),
+                    text=row[fields['text']],
+                )
 
     def search_contacts(self, filter_):
         return self.contacts.values()
@@ -152,29 +153,30 @@ class IMessage(Provider, LazyContactProvider):
     def subset(self, subsetter, events: Iterable[Event], contacts: Iterable[Contact]):
         """
         """
-        with subsetter.db_subset(src_conn=self.conn, new_db_pathname=self.MESSAGE_DB) as subset_db:
-            handle_rows = subset_db.row_subset('handle', 'ROWID')
-            handle_rows.update(
-                contact.provider_data.row_id
-                for contact in contacts
-                if contact.providerName == self.NAME
-            )
+        with self._db() as conn:
+            with subsetter.db_subset(src_conn=conn, new_db_pathname=self.MESSAGE_DB) as subset_db:
+                handle_rows = subset_db.row_subset('handle', 'ROWID')
+                handle_rows.update(
+                    contact.provider_data.row_id
+                    for contact in contacts
+                    if contact.providerName == self.NAME
+                )
 
-            message_rows = subset_db.row_subset('message', 'ROWID')
-            chat_rows = subset_db.row_subset('chat', 'ROWID')
-            chat_message_join_rows = subset_db.row_subset('chat_message_join', 'chat_id')
-            chat_handle_join_rows = subset_db.row_subset('chat_handle_join', 'chat_id')
+                message_rows = subset_db.row_subset('message', 'ROWID')
+                chat_rows = subset_db.row_subset('chat', 'ROWID')
+                chat_message_join_rows = subset_db.row_subset('chat_message_join', 'chat_id')
+                chat_handle_join_rows = subset_db.row_subset('chat_handle_join', 'chat_id')
 
-            for event in events:
-                if not isinstance(event, MessageEvent) or event.provider != self:
-                    continue
+                for event in events:
+                    if not isinstance(event, MessageEvent) or event.provider != self:
+                        continue
 
-                message_rows.add(event.provider_data.message_row_id)
-                chat_rows.add(event.provider_data.chat_row_id)
-                chat_message_join_rows.add(event.provider_data.chat_row_id)
-                chat_handle_join_rows.add(event.provider_data.chat_row_id)
-                if event.session:
-                    handle_rows.update(contact.provider_data.row_id for contact in event.session.participants)
+                    message_rows.add(event.provider_data.message_row_id)
+                    chat_rows.add(event.provider_data.chat_row_id)
+                    chat_message_join_rows.add(event.provider_data.chat_row_id)
+                    chat_handle_join_rows.add(event.provider_data.chat_row_id)
+                    if event.session:
+                        handle_rows.update(contact.provider_data.row_id for contact in event.session.participants)
 
     def all_files(self):
         # TODO
@@ -189,8 +191,9 @@ class IMessage(Provider, LazyContactProvider):
         handle_table = Table('handle')
         query = Query.from_(handle_table).select('ROWID', 'id')
 
-        for row in self.conn.execute(str(query)):
-            yield {'rowid': str(row[0]), 'id_': row[1]}
+        with self._db() as conn:
+            for row in conn.execute(str(query)):
+                yield {'rowid': str(row[0]), 'id_': row[1]}
 
     def contact_create(self, rowid, id_):
         return Contact(
