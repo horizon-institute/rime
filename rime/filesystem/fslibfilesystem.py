@@ -1,4 +1,5 @@
 import os
+import posixpath
 
 from .ensuredir import ensuredir
 from . import metadata
@@ -38,7 +39,7 @@ class FSLibFilesystem:
         return os.stat(self._fs.getsyspath(pathname))
 
     def scandir(self, path):
-        pathnames = [os.path.join(path, name) for name in self._fs.listdir(path)]
+        pathnames = [posixpath.join(path, name) for name in self._fs.listdir(path)]
 
         return metadata.get_dir_entries_and_update_db(self, self.metadata, pathnames)
 
