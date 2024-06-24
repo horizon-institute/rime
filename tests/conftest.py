@@ -14,9 +14,12 @@ RIME_METHOD = os.environ.get('RIME_METHOD', 'http')
 
 VENV = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, '.venv'))
 
-RIMESERVER_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, 'frontend'))
+RIMESERVER_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 RIMESERVER_CMD = [os.path.join(VENV, 'bin', 'uvicorn'), '--interface', 'asgi3', '--port', str(RIME_PORT),
-       '--factory', 'rimeserver:create_app']
+                  '--factory', 'rime:rimeserver_create_app']
+RIMESERVER_ENV = {
+    'RIME_CONFIG': os.path.join(RIMESERVER_DIR, 'frontend', 'rime_settings.yaml'),
+}
 
 
 def _rime_server_running(timeout=0):
@@ -48,7 +51,9 @@ def _install_dependencies():
 
 def _start_rime_server():
     # Start the RIME server in the background.
-    return subprocess.Popen(RIMESERVER_CMD, cwd=RIMESERVER_DIR)
+    env = os.environ.copy()
+    env.update(RIMESERVER_ENV)
+    return subprocess.Popen(RIMESERVER_CMD, cwd=RIMESERVER_DIR, env=env)
 
 
 @pytest.fixture(scope="session", autouse=True)

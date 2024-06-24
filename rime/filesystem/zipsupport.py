@@ -1,4 +1,4 @@
-from zipfile import ZipFile, Path
+from zipfile import ZipFile, Path, ZipInfo
 
 def get_zipfile_main_dir(zf: ZipFile) -> Path:
     """
@@ -19,3 +19,9 @@ def get_zipfile_main_dir(zf: ZipFile) -> Path:
             return element
 
     raise ValueError("The zipfile does not contain a single directory.")
+
+def path_to_info(zf: ZipFile, path: Path) -> ZipInfo:
+    """
+    Convert a Path to a PathInfo object.
+    """
+    return zf.getinfo(str(path))

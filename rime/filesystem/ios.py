@@ -11,6 +11,7 @@ import sqlite3
 import tempfile
 from typing import Optional
 import zipfile
+import posixpath
 
 from iphone_backup_decrypt import EncryptedBackup  # pyright: ignore[reportMissingImports]
 
@@ -68,7 +69,7 @@ class _IosManifest:
         else:
             file_id = self._get_ios_hash(domain, relative_path)
 
-        return os.path.join(file_id[:2], file_id)
+        return posixpath.join(file_id[:2], file_id)
 
     def add_file(self, path):
         """
@@ -317,10 +318,10 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
             # get the main directory contained in the .zip container file
             main_dir = zipsupport.get_zipfile_main_dir(zp)
 
-            with zp.open(main_dir / 'Manifest.db') as zf:
+            with (main_dir / 'Manifest.db').open('rb') as zf:
                 self.temp_manifest.write(zf.read())
 
-            with zp.open(main_dir / '_rime_settings.db') as zf:
+            with (main_dir / '_rime_settings.db').open('rb') as zf:
                 self.temp_settings.write(zf.read())
 
         self.manifest = sqlite3_connect_with_regex_support(self.temp_manifest.name, read_only=True)
@@ -340,10 +341,7 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         with zipfile.ZipFile(path) as zp:
             # get the main directory contained in the .zip container file
             main_dir = zipsupport.get_zipfile_main_dir(zp)
-            return (
-                zipfile.Path(zp, main_dir / 'Manifest.db').exists()
-                and zipfile.Path(zp, main_dir / 'Info.plist').exists()
-            )
+            return (main_dir / 'Manifest.db').exists() and (main_dir / 'Info.plist').exists()
 
     @classmethod
     def create(cls, id_: str, root: str, metadata_db_path, template: Optional['DeviceFilesystem'] = None)\
@@ -368,13 +366,13 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         with zipfile.ZipFile(self.root) as zp:
             # get the main directory contained in the .zip container file
             main_dir = zipsupport.get_zipfile_main_dir(zp)
-            return zipfile.Path(zp, main_dir.name / real_path).exists()
+            return (main_dir / real_path).exists()
 
     def getsize(self, path) -> int:
         with zipfile.ZipFile(self.root) as zp:
             # get the main directory contained in the .zip container file
             main_dir = zipsupport.get_zipfile_main_dir(zp)
-            return zp.getinfo(main_dir / self._converter.get_hashed_pathname(path)).file_size
+            return zipsupport.path_to_info(zp, main_dir / self._converter.get_hashed_pathname(path)).file_size
 
     def ios_open_raw(self, path, mode):
         # TODO: mode
@@ -382,7 +380,7 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         with zipfile.ZipFile(self.root) as zp:
             # get the main directory contained in the .zip container file
             main_dir = zipsupport.get_zipfile_main_dir(zp)
-            with zp.open(main_dir / path) as zf:
+            with (main_dir / path).open('rb') as zf:
                 tmp_copy.write(zf.read())
         return tmp_copy
 
@@ -398,7 +396,7 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         with zipfile.ZipFile(self.root) as zp:
             # get the main directory contained in the .zip container file
             main_dir = zipsupport.get_zipfile_main_dir(zp)
-            with zp.open(main_dir / self._converter.get_hashed_pathname(path)) as zf:
+            with (main_dir / self._converter.get_hashed_pathname(path)).open('rb') as zf:
                 tmp_copy.write(zf.read())
 
         log.debug(f"iOS connecting to {tmp_copy.name}")
@@ -415,7 +413,7 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         with zipfile.ZipFile(self.root, 'w') as zp:
             # get the main directory contained in the .zip container file
             main_dir = zipsupport.get_zipfile_main_dir(zp)
-            with zp.open(main_dir / '_rime_settings.db', 'w') as zf:
+            with zp.open(str(main_dir / '_rime_settings.db'), 'w') as zf:
                 zf.write(self.temp_settings.read())
 
     def is_locked(self) -> bool:
