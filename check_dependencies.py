@@ -24,6 +24,9 @@ def normalize_version(version: str) -> str:
 def check_package(req: str) -> bool:
     " Does 'req' (requirements.txt line) match the currently installed packages? "
     # Get the package name and the version
+    if ';' in req:
+        req = req.split(';')[0].strip()
+
     version = None  # shut linter up
     if req.startswith('-e'):
         # Editable. Just check package name without version.
