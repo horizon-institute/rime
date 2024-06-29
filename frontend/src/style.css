@@ -5,113 +5,119 @@ Copyright 2023 Telemarq Ltd
 */
 
 :root {
-	font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-	font-size: 16px;
-	line-height: 24px;
-	font-weight: 400;
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
 
-	background-color: white;
+  background-color: white;
 
-	font-synthesis: none;
-	text-rendering: optimizeLegibility;
-	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
-	-webkit-text-size-adjust: 100%;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
 
-	--theme-message-bg: #e5e5ea;
-	--theme-message-fg: black;
-	--theme-message-from_me-bg: #1e94fd;
-	--theme-message-from_me-fg: white;
+  --theme-message-bg: #e5e5ea;
+  --theme-message-fg: black;
+  --theme-message-from_me-bg: #1e94fd;
+  --theme-message-from_me-fg: white;
 }
 
 body {
-	margin: 0;
-	border: 0;
-	padding: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
 }
 
 #app {
 }
 
 #logo {
-    height: 3em;
-    margin: 0.2em 1em -1em 1em;
+  height: 3em;
+  margin: 0.2em 1em -1em 1em;
 }
 
 .text-box {
-	border-color: #eee;
-	border-style: solid;
-	padding: 4px 8px;
-	border-radius: 4px;
-	margin-left: -8px;
+  border-color: #eee;
+  border-style: solid;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-left: -8px;
 }
 
 h1 {
-	font-size: 18px;
-	font-weight: normal;
-	background-color: #eee;
-	padding: 4px 8px;
-	border-radius: 4px;
-	margin-left: -8px;
+  font-size: 18px;
+  font-weight: normal;
+  background-color: #eee;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-left: -8px;
 }
 
 select {
-	width: 100%;
-	font-size: 16px;
-	padding: 0.5em;
-	border-radius: 5px;
-	background-color: #eee;
+  width: 100%;
+  font-size: 16px;
+  padding: 0.5em;
+  border-radius: 5px;
+  background-color: #eee;
 }
 
 button {
-	font-size: 16px;
-	padding: 0.5em;
-	border-radius: 5px;
-	border: 1px solid #ccc;
-	background-color: #eee;
+  font-size: 16px;
+  padding: 0.5em;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  background-color: #eee;
 }
 
 button.disabled {
-	opacity: 0.5;
+  opacity: 0.5;
 }
 
 /* Custom checkbox style */
-input[type="checkbox"] {
-	display: none;
+input[type='checkbox'] {
+  display: none;
 }
 
-input[type="checkbox"]+label:before {
-	background: #eee;
-	display: inline-block;
-	width: 1.5em;
-	border: 1px solid #ccc;
-	content: '\2003'; 
-	text-align: center;
-	margin: 2px;
-	margin-right: 0.5em;
-	border-radius: 2px;
+input[type='checkbox'] + label:before {
+  background: #eee;
+  display: inline-block;
+  width: 1.5em;
+  border: 1px solid #ccc;
+  content: '\2003';
+  text-align: center;
+  margin: 2px;
+  margin-right: 0.5em;
+  border-radius: 2px;
 }
 
-input[type="checkbox"]:checked+label:before {
-	content: '\2714';
+input[type='checkbox']:checked + label:before {
+  content: '\2714';
 }
 
-input[type="password"] {
-	font-size: 16px;
-	padding: 0.5em;
-	border-radius: 5px;
-	border: 2px solid #ccc;
-	background-color: white;
+input[type='password'] {
+  font-size: 16px;
+  padding: 0.5em;
+  border-radius: 5px;
+  border: 2px solid #ccc;
+  background-color: white;
 }
-
 
 @keyframes fadein {
-	from { opacity: 0; }
-	to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes fadeout {
-	from { opacity: 1; }
-	to   { opacity: 0; }
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
-

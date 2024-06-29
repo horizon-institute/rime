@@ -42,7 +42,9 @@ onDone((result) => {
 
 <template>
   <div class="encrypted">
-    <span class="decrypt" @click="showPassphraseInput = !showPassphraseInput">&#128273;</span>
+    <span class="decrypt" @click="showPassphraseInput = !showPassphraseInput"
+      >&#128273;</span
+    >
     <span
       class="wrong-passphrase"
       v-show="showWrongPassphraseMessage"
@@ -52,7 +54,11 @@ onDone((result) => {
   </div>
 
   <div class="container" v-if="showPassphraseInput">
-    <input type="password" v-model="passphrase" placeholder="Type passphrase..." />
+    <input
+      type="password"
+      v-model="passphrase"
+      placeholder="Type passphrase..."
+    />
     <button
       @click="
         decryptDevice({
