@@ -1,4 +1,4 @@
-<!-- 
+<!--
 This software is released under the terms of the GNU GENERAL PUBLIC LICENSE.
 See LICENSE.txt for full details.
 Copyright 2023 Telemarq Ltd
@@ -10,20 +10,18 @@ Copyright 2023 Telemarq Ltd
       <div v-for="device in activeDevices" class="header">
         <span class="deviceName">{{ device }}</span>
       </div>
-      <div
-        v-if="searchResult"
-        v-for="eventRow in eventsRowGenerator()"
-        class="row"
-      >
-        <template v-for="event in eventRow">
-          <div v-if="event !== null" class="event" :class="event.__typename">
-            <SearchResultMessageEvent
-              v-if="event.__typename == 'MessageEvent'"
-              :event="event"
-            />
-          </div>
-          <div v-else class="event"></div>
-        </template>
+      <div v-if="searchResult">
+        <div v-for="eventRow in eventsRowGenerator()" class="row">
+          <template v-for="event in eventRow">
+            <div v-if="event !== null" class="event" :class="event.__typename">
+              <SearchResultMessageEvent
+                v-if="event.__typename == 'MessageEvent'"
+                :event="event"
+              />
+            </div>
+            <div v-else class="event"></div>
+          </template>
+        </div>
       </div>
     </div>
     <div v-if="activeDevices.length === 0" class="center text-box">

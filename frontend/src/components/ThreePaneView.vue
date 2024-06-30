@@ -1,4 +1,4 @@
-<!-- 
+<!--
 This software is released under the terms of the GNU GENERAL PUBLIC LICENSE.
 See LICENSE.txt for full details.
 Copyright 2023 Telemarq Ltd
@@ -9,14 +9,11 @@ import { ref } from 'vue';
 import DeviceChooser from './DeviceChooser.vue';
 import Search from './Search.vue';
 import Subsetter from './Subsetter.vue';
-import ProviderChooser from './ProviderChooser.vue';
 import SearchViewChooser from './SearchViewChooser.vue';
 import SearchResults from './SearchResults.vue';
 import SearchResultsMedia from './SearchResultsMedia.vue';
 
 import { searchView } from '../store.js';
-
-const showRefinements = ref(false);
 
 const popoverMessage = ref('This is the popover message');
 

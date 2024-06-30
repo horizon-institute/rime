@@ -1,19 +1,17 @@
-<!-- 
+<!--
 This software is released under the terms of the GNU GENERAL PUBLIC LICENSE.
 See LICENSE.txt for full details.
 Copyright 2023 Telemarq Ltd
 -->
 
 <script setup>
-import { watch, ref, nextTick } from 'vue';
-import { useQuery, useMutation } from '@vue/apollo-composable';
+import { watch, nextTick } from 'vue';
 import {
   devices,
   activeDevices,
   deleteDevice,
   setDeviceSelected,
 } from '../store.js';
-import gql from 'graphql-tag';
 
 import DeviceDecryptWidget from './DeviceDecryptWidget.vue';
 
