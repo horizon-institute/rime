@@ -2,11 +2,11 @@
 // See LICENSE.txt for full details.
 // Copyright 2023 Telemarq Ltd
 
-import { createApp, provide } from 'vue'
-import './style.css'
-import { DefaultApolloClient } from '@vue/apollo-composable'
-import App from './App.vue'
-import { apolloClient } from './store'
+import { createApp, provide } from 'vue';
+import './style.css';
+import { DefaultApolloClient } from '@vue/apollo-composable';
+import App from './App.vue';
+import { apolloClient } from './store';
 
 const app = createApp(App);
 
