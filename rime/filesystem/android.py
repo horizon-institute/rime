@@ -82,6 +82,13 @@ class AndroidDeviceFilesystem(DeviceFilesystem):
 
     def get_dir_entry(self, path):
         return self._fsaccess.get_dir_entry(path)
+    
+    # TBD - implement this!
+    def get_device_info(self) -> dict:
+        # See https://github.com/abrignoni/ALEAPP/blob/main/scripts/artifacts/build.py
+        # for example of how to get device info.
+        
+        return {}
 
 
 class AndroidZippedDeviceFilesystem(DeviceFilesystem):

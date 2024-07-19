@@ -33,6 +33,17 @@ async function toggleDeviceActive(id) {
 
   await setDeviceSelected(id, cb.checked);
 }
+
+// Toggle the view of device info
+// I'm pretty bemused by the fact that it's so hard to do this in 
+// Vue itself.  Where's Bootstrap when you need it?
+function toggleDeviceInfo(id) {
+  const info = document.getElementById('device-info-' + id);
+  if (!info) return;
+
+  info.style.display = info.style.display === 'none' ? 'block' : 'none';
+}
+
 </script>
 
 <template>
@@ -64,6 +75,24 @@ async function toggleDeviceActive(id) {
       >
         &#10060;
       </div>
+      <span 
+        class="info_button"
+        v-if="device.device_info.length > 0"
+        @click="toggleDeviceInfo(device.id)"
+        title="Show/hide extended device info"
+      >
+        &#9432;
+      </span>
+      <div
+        class="device_info"
+        :id="'device-info-' + device.id"
+        v-if="device.device_info.length > 0"
+        style="display: none;"
+      >
+        <div v-for="info in device.device_info">
+          <b>{{ info.key }}</b>: {{ info.value }}
+        </div>
+      </div>
     </div>
     <div v-if="devices.length === 0">
       <p>No data detected.</p>
@@ -88,6 +117,14 @@ async function toggleDeviceActive(id) {
   cursor: pointer;
 }
 
+.info_button {
+  display: inline-block;
+  font-size: 0.8em;
+  color: #038;
+  cursor: pointer;
+  float: right;
+  margin: 0 0.5em;
+}
 .country_code {
   padding-left: 0.5em;
   font-size: 0.7em;
@@ -98,6 +135,14 @@ async function toggleDeviceActive(id) {
 label.locked {
   color: #888;
   cursor: default;
+}
+
+.device_info {
+  padding-left: 1em;
+  font-size: 0.75em;
+  color: #666;
+  line-height: 1.3em;
+  margin-bottom: 0.8em;
 }
 
 /* Github-style inline code formatting: https://stackoverflow.com/a/22997770 */

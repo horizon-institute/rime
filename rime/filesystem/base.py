@@ -153,3 +153,6 @@ class DeviceFilesystem(ABC):
 
     def decrypt(self, passphrase: str) -> bool:
         raise NotImplementedError()
+
+    def get_device_info(self) -> dict:
+        raise NotImplementedError()

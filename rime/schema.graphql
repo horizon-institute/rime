@@ -101,6 +101,15 @@ input DeviceIdPair {
 }
 
 """
+A key/value pair of device info.
+A list of these is returned by the device_info field of the Device type.
+"""
+type DeviceInfoItem {
+  key: String!
+  value: String!
+}
+
+"""
 Represents a single device dump.
 """
 type Device {
@@ -134,7 +143,13 @@ type Device {
   Is the filesystem encrypted and requires decryption?
   """
   is_encrypted: Boolean
+
+  """
+  Misc properties of the device, such as Display Name, Model, etc.
+  """
+  device_info: [DeviceInfoItem]
 }
+
 
 input EventsFilter{
   """

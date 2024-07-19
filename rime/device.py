@@ -65,6 +65,12 @@ class Device:
     def is_encrypted(self) -> bool:
         return self.fs.is_encrypted()
 
+    def device_info(self) -> str:
+        try:
+            return [[k,v] for (k,v) in self.fs.get_device_info().items()]
+        except NotImplementedError:
+            return []
+    
     def decrypt(self, passphrase: str):
         """
         Try to decrypt device with provided passphrase. Return:

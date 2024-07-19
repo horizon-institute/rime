@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 import os
 import plistlib
 import hashlib
-from logging import getLogger
+import logging
 import shutil
 import sqlite3
 import tempfile
@@ -23,8 +23,8 @@ from . import metadata
 from . import zipsupport
 from ..sql import Table, Query, get_field_indices, sqlite3_connect_filename as sqlite3_connect_with_regex_support
 
-log = getLogger(__name__)
-
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
 
 class _IosManifest:
     def __init__(self, manifest_conn):
@@ -175,6 +175,7 @@ class IosDeviceFilesystemBase(ABC):
         raise NotImplementedError
 
 
+
 class IosDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
     def __init__(self, id_: str, root: str, metadata_db_path: str, writeable_manifest: bool = False):
         self.id_ = id_
@@ -187,6 +188,7 @@ class IosDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         self._settings = DeviceSettings(root)
         self._converter = _IosManifest(self.manifest)
         self._metadata = metadata.MetadataDb(metadata_db_path)
+        self._device_info = None
 
     @classmethod
     def is_device_filesystem(cls, path):
@@ -288,6 +290,31 @@ class IosDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
     def is_locked(self) -> bool:
         return self._settings.is_locked()
 
+    def get_device_info(self) -> dict:
+        # Cache the device info
+        if self._device_info is None:
+            try:
+                # Note the Info.plist filename is at the top level: not hashed
+                info_plist_file = os.path.join(self.root, 'Info.plist')
+                if os.path.exists( info_plist_file):
+                    log.debug(f"Reading {info_plist_file}")
+                    with open(info_plist_file, 'rb') as f:
+                        info_plist = plistlib.load(f)
+                        self._device_info = {
+                            k: info_plist.get(k, "") for k in [
+                                'Device Name',  'Display Name', 
+                                'Product Name', 'Product Type', 'Product Version', 'Build Version',
+                                'GUID', 'ICCID', 'IMEI', 'MEID', 'Phone Number', 'Serial Number',
+                                'Target Identifier', 'Target Type', 'Unique Identifier'
+                            ]
+                        }
+            except plistlib.InvalidFileException:
+                log.error(f"Failed to read {info_plist_file}")
+                self._device_info = {}
+        else:
+            self._device_info = {}
+        return self._device_info
+
     def dirname(self, path):
         raise NotImplementedError(path)
 
@@ -331,6 +358,7 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         self._settings = DeviceSettings(settings_dir, settings_file)
         self._converter = _IosManifest(self.manifest)
         self._metadata = metadata.MetadataDb(metadata_db_path)
+        self._device_info = None
 
     def __del__(self):
         del self._converter
@@ -437,7 +465,41 @@ class IosZippedDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
 
     def is_locked(self) -> bool:
         return self._settings.is_locked()
-
+    
+    def get_device_info(self) -> dict:
+        # Cache the device info
+        if self._device_info is None:
+            try:
+                with zipfile.ZipFile(self.root) as zp:
+                    # get the main directory contained in the .zip container file
+                    main_dir = zipsupport.get_zipfile_main_dir(zp)
+                    # It should contain an Info.plist file
+                    info_plist_file = main_dir / 'Info.plist'
+                    if info_plist_file.exists():
+                        log.debug(f"Reading {info_plist_file}")
+                        with info_plist_file.open('rb') as f:
+                            info_plist = plistlib.load(f)
+                            self._device_info = {
+                                k: info_plist.get(k, "") for k in [
+                                    'Device Name',  'Display Name', 
+                                    'Product Name', 'Product Type', 'Product Version', 'Build Version',
+                                    'GUID', 'ICCID', 'IMEI', 'MEID', 'Phone Number', 'Serial Number',
+                                    'Target Identifier', 'Target Type', 'Unique Identifier'
+                                ]
+                            }
+                    else:
+                        log.warning(f"Failed to read {info_plist_file}")
+                        self._device_info = {}
+            except zipfile.BadZipFile:
+                log.warning(f"Failed to read Zipfile {self.root}")
+                self._device_info = {}
+            except plistlib.InvalidFileException:
+                log.info(f"Failed to read {info_plist_file} from within {self.root}")
+                self._device_info = {}
+        else:
+            self._device_info = {}
+        return self._device_info
+    
     def dirname(self, path):
         raise NotImplementedError(path)
 

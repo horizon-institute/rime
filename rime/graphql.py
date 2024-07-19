@@ -465,6 +465,28 @@ def resolve_device_is_encrypted(device, info):
 def resolve_device_country_code(device, info):
     return device.country_code
 
+# Device Info is a set of key/value pairs
+class DeviceInfoItem:
+    def __init__(self, key, value):
+        self.key = key
+        self.value = value
+
+@device_resolver.field('device_info')
+def resolve_device_info(device, info):
+    return [DeviceInfoItem(k,v) for (k,v) in device.device_info()]
+
+
+device_info_item_resolver = ObjectType('DeviceInfoItem')
+
+@device_info_item_resolver.field('key')
+def resolve_device_info_key(device_info_item, info):
+    return device_info_item[0]
+
+
+@device_info_item_resolver.field('value')
+def resolve_device_info_value(device_info_item, info):
+    return device_info_item[1]
+
 # Subsetting
 
 
