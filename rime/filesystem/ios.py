@@ -2,6 +2,7 @@
 # See LICENSE.txt for full details.
 # Copyright 2023 Telemarq Ltd
 from abc import ABC, abstractmethod
+import datetime
 import os
 import plistlib
 import hashlib
@@ -209,7 +210,7 @@ class IosDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
         # Create Manifest for file hashing. Do this manually because we don't have a device yet.
         syspath = os.path.join(root, 'Manifest.db')
 
-        print(f'Creating {syspath}...')
+        log.info(f'Creating {syspath}...')
         with sqlite3_connect_with_regex_support(syspath, read_only=False) as conn:
             conn.execute("""CREATE TABLE Files (
                 fileID TEXT PRIMARY KEY,
@@ -222,8 +223,15 @@ class IosDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
 
         if template is None:
             # Create Info.plist.
-            with open(os.path.join(root, 'Info.plist'), 'wb'):
-                pass  # touch the file to ensure it exists
+            with open(os.path.join(root, 'Info.plist'), 'wb') as fp:
+                info = {
+                    'Device Name': 'RIME Device Subset',
+                    'Display Name': 'RIME Device Subset created on ' + str(datetime.datetime.now()),
+                    'Product Name': 'RIME iOS Device Subset',
+                    'Product Type': 'RIME iOS Device Subset',
+                }
+                plistlib.dump(info, fp)
+            log.info(f'Created {os.path.join(root, "Info.plist")}')
         else:
             # Copy Info.plist from template.
             # TODO: There are some PII implications here.
@@ -309,7 +317,7 @@ class IosDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
                             ]
                         }
             except plistlib.InvalidFileException:
-                log.error(f"Failed to read {info_plist_file}")
+                log.warning(f"Failed to read {info_plist_file}")
                 self._device_info = {}
         else:
             self._device_info = {}

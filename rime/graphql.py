@@ -6,6 +6,7 @@
 Support for GraphQL querying in RIME.
 """
 import asyncio
+import logging
 import re
 import traceback
 from dataclasses import dataclass
@@ -26,6 +27,8 @@ from .device import Device
 from .provider import Provider
 from .event import Event, MessageSession
 
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
 
 # A per-query context which includes RIME. This is what is provided in the per-query context value.
 class QueryContext:
@@ -480,12 +483,12 @@ device_info_item_resolver = ObjectType('DeviceInfoItem')
 
 @device_info_item_resolver.field('key')
 def resolve_device_info_key(device_info_item, info):
-    return device_info_item[0]
+    return device_info_item.key
 
 
 @device_info_item_resolver.field('value')
 def resolve_device_info_value(device_info_item, info):
-    return device_info_item[1]
+    return device_info_item.value
 
 # Subsetting
 
@@ -708,7 +711,8 @@ def subsets_resolver(payload, info):
 RESOLVERS = [
     datetime_scalar, query_resolver, event_resolver, message_event_resolver, media_event_resolver,
     message_session_resolver, provider_resolver, contact_resolver, merged_contact_resolver, name_resolver,
-    device_resolver, mutation, devices_subscription, subsets_subscription, events_result_resolver
+    device_resolver, device_info_item_resolver,
+    mutation, devices_subscription, subsets_subscription, events_result_resolver
 ]
 
 

@@ -5,6 +5,7 @@
 import asyncio
 from collections import defaultdict
 from dataclasses import dataclass
+import logging
 import os
 import threading
 
@@ -22,6 +23,8 @@ FILESYSTEM_REGISTRY = threading.local()
 DEVICE_CACHE = threading.local()
 RIME = threading.local()
 
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class AsyncEventListener:
