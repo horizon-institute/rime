@@ -12,12 +12,15 @@ PYTHON=${PYTHON:-python3.10}
 if ! command -v $PYTHON &> /dev/null; then
 	if command -v python3; then
 		PYTHON=python3
-		echo WARNING:
-		echo WARNING: Python 3.10 not found. Falling back to `python3 --version`.
-		echo WARNING: If you experience any issues, please try Python 3.10.
-		echo WARNING:
+		# Check if the installed Python version is 3.10 or later.
+		if ! ${PYTHON} -c "import sys; sys.exit( 0 if (sys.version_info[1]>=10) else 1)" ; then
+			echo ERROR: Python 3.10 or later not found. 
+			echo Please install it or set the PYTHON environment variable to point to it.
+			exit 1
+		fi
 	else
-		echo ERROR: Python 3.10 not found. Please install it or set the PYTHON environment variable.
+		echo ERROR: Python 3 not found. 
+		echo Please install it or set the PYTHON environment variable to point to it.
 		exit 1
 	fi
 fi
