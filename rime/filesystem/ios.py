@@ -319,8 +319,6 @@ class IosDeviceFilesystem(DeviceFilesystem, IosDeviceFilesystemBase):
             except plistlib.InvalidFileException:
                 log.warning(f"Failed to read {info_plist_file}")
                 self._device_info = {}
-        else:
-            self._device_info = {}
         return self._device_info
 
     def dirname(self, path):
