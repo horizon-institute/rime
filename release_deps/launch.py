@@ -86,7 +86,7 @@ if not os.path.exists(config_pathname):
     shutil.copy(config_dist_pathname, config_pathname)
 
     # Since we created the config, this may be a new install. Copy the examples as well.
-    examples_dist_dir = os.path.join(PYTHONDIR, 'example')
+    examples_dist_dir = os.path.join(PYTHONDIR, os.pardir, 'example')
     examples_dir = os.path.join(rime_base, 'example')
     shutil.copytree(examples_dist_dir, examples_dir)
 
