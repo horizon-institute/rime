@@ -73,6 +73,11 @@ def rime_background_task_entrypoint(config, cmd, args):
     return result
 
 
+STATIC_MIME_TYPES = {
+    '.js': 'application/javascript',
+}
+
+
 class ZippedStaticFiles:
     def __init__(self, zip_pathname):
         self.zf = zipfile.ZipFile(zip_pathname, 'r')
@@ -81,7 +86,14 @@ class ZippedStaticFiles:
         if path == '':
             path = 'index.html'
 
-        mime_type = mimetypes.guess_type(path)[0]
+        # Windows 10 (may?) incorrectly identify JavaScript as text/plain. See https://bugs.python.org/issue43975
+        for ext, candidate_mime_type in STATIC_MIME_TYPES.items():
+            if path.endswith(ext):
+                mime_type = candidate_mime_type
+                break
+        else:
+            mime_type = mimetypes.guess_type(path)[0]
+
         return StreamingResponse(self.zf.open(path), media_type=mime_type)
 
 
