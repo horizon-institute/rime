@@ -29,3 +29,30 @@ Within that directory, you can clone the RIME repository:
 
 And within that 'rime' directory you can probably then use the 'run_dev.sh' script as described in the main README.md file.
 
+## Creating a Windows distribution
+The Windows release depends on a pre-built Python embedded installation (the `WINDOWS_PYTHON_DIST` variable in `make_release.py`), which must have all Rime's requirements installed.
+
+If you don't have one of these, you can create one by following these steps (assuming that RIME is mounted as z:\rime):
+
+1) With a "fully-fledged" Windows Python installation, run:
+
+    python -m pip wheel -r z:\rime\requirements.txt -w wheels
+
+This builds all the wheels. You will need a compiler installed.
+
+2) Download the Python embedded distribution from python.org and unzip it somewhere.
+3) Edit the .pth file to include site-packages (as explained in the file)
+4) Install pip by downloading get-pip.py and running it with the embedded Python.
+5) Run:
+
+    python -m pip install --no-index --find-links z:\rime\wheels -r z:\rime\requirements.txt
+
+This installs all the wheels. (If you get errors about "invalid signature" here, move the wheels to a local drive.)
+
+6) Zip up the result. You now have an embedded Python installation with all Rime's requirements installed.
+
+If requirements.txt changes, or you're starting from scratch without a wheel dir, you'll need to rebuild all the
+wheels. Run:
+
+    python -m pip wheel -w z:\rime\wheels -r z:\rime\requirements.txt
+

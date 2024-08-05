@@ -12,3 +12,7 @@ example
 
 # Ignore MacOS specific file
 .DS_Store
+
+# Wheels required to make a Windows release.
+wheels
+releases
