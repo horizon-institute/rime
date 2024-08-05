@@ -1,4 +1,10 @@
 #include <Windows.h>
+#include <string>
+#include <optional>
+#include <shellapi.h>
+#include "PathCch.h"
+
+
 
 #define PY_SSIZE_T_CLEAN
 
@@ -80,19 +86,64 @@ static void OnPythonThreadStarted(void *data)
 		return;
 	}
 
-    PyRun_SimpleFileEx(fp, "launch.py", 1);
+    // We read launch.py and run it as a string so as to avoid passing FILE pointers from the launcher to the Python library.
+    // This is because the Nuget version of the Python library we are using includes only a release build. Building
+    // a debug build of the rest of the project results in FILE structures that are incompatible with the release build
+    // and cause weird crashes deep inside msvcrt.
+    fseek(fp, 0, SEEK_END);
+    size_t size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    char *buffer = new char[size + 1];
+    fread(buffer, 1, size, fp);
+    buffer[size] = 0;
+
+    fclose(fp);
+
+    PyRun_SimpleString(buffer);
+
+    delete[] buffer;
+}
+
+static std::optional<std::wstring> getPythonDir()
+{
+    // Try to find the Python install dir as either below the executable or below the cwd.
+     // 1. Try below the executable.
+    wchar_t pythonInstallDir[MAX_PATH];
+
+    GetModuleFileNameW(NULL, pythonInstallDir, MAX_PATH);
+    PathCchRemoveFileSpec(pythonInstallDir, MAX_PATH);
+    wcscat_s(pythonInstallDir, MAX_PATH, L"\\python");
+
+    if (GetFileAttributesW(pythonInstallDir) == INVALID_FILE_ATTRIBUTES)
+    {
+        // 2. Try below the cwd.
+        GetCurrentDirectoryW(MAX_PATH, pythonInstallDir);
+        wcscat_s(pythonInstallDir, MAX_PATH, L"\\python");
+
+        if (GetFileAttributesW(pythonInstallDir) == INVALID_FILE_ATTRIBUTES)
+        {
+            OutputDebugString(L"Python not found\n");
+            return nullptr;
+        }
+    }
+
+    return std::wstring(pythonInstallDir);
 }
 
 const wchar_t *launchPySuffix = L"launch.py";
 
 void *StartRimeServer(void(*OnServerStartedFn)(void*), void* data)
 {
-    auto pythonInstallDir = L"C:\\Users\\wzddm\\source\\rime-release-test\\rime-windows\\python";
+    auto pythonInstallDir = getPythonDir();
+    if (!pythonInstallDir.has_value())
+	{
+		return nullptr;
+	}
 
-    size_t maxLen = wcslen(pythonInstallDir) + wcslen(launchPySuffix) + 2;
+    size_t maxLen = pythonInstallDir->size() + wcslen(launchPySuffix) + 2;
     auto launchPy = new wchar_t[maxLen];
 
-    swprintf_s(launchPy, maxLen, L"%s\\%s", pythonInstallDir, launchPySuffix);
+    swprintf_s(launchPy, maxLen, L"%s\\%s", pythonInstallDir->c_str(), launchPySuffix);
 
     OnRimeServerStartedStruct* onRimeServerStarted = new OnRimeServerStartedStruct();
     onRimeServerStarted->OnServerStarted = OnServerStartedFn;
@@ -106,7 +157,7 @@ void *StartRimeServer(void(*OnServerStartedFn)(void*), void* data)
     CreateDirectoryW(LogPath, NULL);
     wcscat_s(LogPath, MAX_PATH, L"\\rime.log");
 
-    InitEmbedPython(pythonInstallDir, OnPythonThreadStarted, LogPath, onRimeServerStarted);
+    InitEmbedPython(pythonInstallDir.value(), OnPythonThreadStarted, LogPath, onRimeServerStarted);
 
     return onRimeServerStarted;
 }

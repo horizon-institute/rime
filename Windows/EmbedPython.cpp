@@ -1,4 +1,5 @@
 #include <Windows.h>
+#include <string>
 
 #define PY_SSIZE_T_CLEAN
 
@@ -18,9 +19,11 @@ FILE* logFile = nullptr;
 
 struct NewPythonThreadStartupInfo
 {
-    const wchar_t* pythonInstallDir;
+    const std::wstring pythonInstallDir;
 	void(*onStart)(void *);
 	void *param;
+
+    NewPythonThreadStartupInfo(const std::wstring pythonInstallDir, void(*onStart)(void *), void *param) : pythonInstallDir(pythonInstallDir), onStart(onStart), param(param) {}
 };
 
 static PyObject* PythonWriteImpl(PyObject* self, PyObject* args)
@@ -68,24 +71,12 @@ static DWORD WINAPI PythonThread(LPVOID lpParam)
     PyConfig config;
     PyConfig_InitIsolatedConfig(&config);
 
-    config.home = (wchar_t *)info->pythonInstallDir;
+    // TODO: Do we need this copy?
+    config.home = new wchar_t[info->pythonInstallDir.size() + 1];
+    wcscpy_s(config.home, info->pythonInstallDir.size() + 1, info->pythonInstallDir.c_str());
 
+    OutputDebugString(L"Initializing Python from config...\n");
     OutputDebugString(config.home);
-
-#if 0
-    size_t maxLen = wcslen(info->pythonInstallDir) + wcslen(pythonZipSuffix) + 2;
-    auto pythonZip = new wchar_t[maxLen];
-
-    swprintf_s(pythonZip, maxLen, L"%s\\%s", info->pythonInstallDir, pythonZipSuffix);
-    PyConfig_SetString(&config, &config.pythonpath_env, pythonZip);
-
-    delete[] pythonZip;
-
-    auto pythonExePath = new wchar_t[wcslen(info->pythonInstallDir) + wcslen(pythonExeSuffix) + 2];
-    swprintf_s(pythonExePath, wcslen(info->pythonInstallDir) + wcslen(pythonExeSuffix) + 2, L"%s\\%s", info->pythonInstallDir, pythonExeSuffix);
-    PyConfig_SetString(&config, &config.executable, pythonExePath);
-#endif
-
 
     Py_InitializeFromConfig(&config);
 
@@ -154,13 +145,9 @@ static DWORD WINAPI PythonThread(LPVOID lpParam)
 }
 
 
-void InitEmbedPython(const wchar_t *pythonInstallDir, void(*onStart)(void *), wchar_t *logFilename, void *param)
+void InitEmbedPython(const std::wstring pythonInstallDir, void(*onStart)(void *), wchar_t *logFilename, void *param)
 {
-    NewPythonThreadStartupInfo* info = new NewPythonThreadStartupInfo();
-
-	info->pythonInstallDir = pythonInstallDir;
-    info->onStart = onStart;
-    info->param = param;
+    NewPythonThreadStartupInfo* info = new NewPythonThreadStartupInfo(pythonInstallDir, onStart, param);
 
     if (logFilename)
     {
