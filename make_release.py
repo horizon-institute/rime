@@ -197,7 +197,7 @@ def make_windows_release(release_dir):
         dst_zf.write('rime/schema.graphql', arcname=PYTHON_BASEDIR + '/schema.graphql')
 
         # Install Windows binary
-        dst_zf.write('release_deps/rime.exe', arcname=PYTHON_BASEDIR + '/rime.exe')
+        dst_zf.write('release_deps/Rime.exe', arcname='/Rime.exe')
 
     return release_zip_pathname
 
