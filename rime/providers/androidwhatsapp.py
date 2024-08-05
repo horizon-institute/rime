@@ -2,7 +2,6 @@
 # See LICENSE.txt for full details.
 # Copyright 2023 Telemarq Ltd
 
-import os.path
 import datetime
 from typing import Iterable
 from dataclasses import dataclass
