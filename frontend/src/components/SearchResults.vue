@@ -5,7 +5,6 @@ Copyright 2023 Telemarq Ltd
 -->
 <template>
   <div>
-    <button id="refresh" @click="eventsRefetch()">&#128472;</button>
     <div class="searchResultsTable">
       <div v-for="device in activeDevices" class="header">
         <span class="deviceName">{{ device }}</span>
@@ -72,13 +71,6 @@ Copyright 2023 Telemarq Ltd
   color: #aaa;
 }
 
-#refresh {
-  position: fixed;
-  top: 2px;
-  right: 2px;
-  width: 3em;
-  z-index: 1;
-}
 </style>
 
 <script setup>
@@ -86,8 +78,7 @@ import { ref, watch, computed } from 'vue';
 import {
   eventsFilter,
   activeDevices,
-  rawEventsSearchResult,
-  eventsRefetch,
+  rawEventsSearchResult
 } from '../store.js';
 import { useQuery } from '@vue/apollo-composable';
 import gql from 'graphql-tag';
